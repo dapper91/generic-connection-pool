@@ -1,0 +1,55 @@
+[tool.poetry]
+name = "generic-connection-pool"
+version = "0.1.0"
+description = "generic connection pool"
+authors = ["Dmitry Pershin <dapper1291@gmail.com>"]
+license = "Unlicense"
+readme = "README.rst"
+homepage = "https://github.com/dapper91/generic-connection-pool"
+repository = "https://github.com/dapper91/generic-connection-pool"
+documentation = "https://github.com/dapper91/generic-connection-pool"
+keywords = [
+    'pool', 'connection-pool', 'generic', 'asyncio', 'socket', 'tcp', 'db', 'http',
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "License :: Public Domain",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Networking",
+    "Programming Language :: Python :: 3",
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+psycopg2 = {version = "^2.9.5", optional = true}
+
+[tool.poetry.extras]
+psycopg2 = ["psycopg2"]
+
+
+[tool.poetry.dev-dependencies]
+pre-commit = "^3.1.1"
+mypy = "^1.1.1"
+pytest = "^7.2.2"
+pytest-asyncio = "^0.20.3"
+pytest-mock = "^3.10.0"
+pytest-cov = "^4.0.0"
+types-psycopg2 = "^2.9.21"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.mypy]
+allow_redefinition = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+strict_equality = true
+warn_unused_ignores = true

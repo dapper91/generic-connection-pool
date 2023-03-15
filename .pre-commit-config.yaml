@@ -1,0 +1,75 @@
+default_stages:
+ - commit
+ - merge-commit
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        stages:
+          - commit
+      - id: mixed-line-ending
+        name: fix line ending
+        stages:
+          - commit
+        args:
+          - --fix=lf
+      - id: mixed-line-ending
+        name: check line ending
+        stages:
+          - merge-commit
+        args:
+          - --fix=no
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v2.4.0
+    hooks:
+      - id: add-trailing-comma
+        stages:
+          - commit
+  - repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: v2.0.2
+    hooks:
+      - id: autopep8
+        stages:
+          - commit
+        args:
+          - --diff
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: fix import order
+        stages:
+          - commit
+        args:
+          - --line-length=120
+          - --multi-line=9
+          - --project=generic_connection_pool
+      - id: isort
+        name: check import order
+        stages:
+          - merge-commit
+        args:
+          - --check-only
+          - --line-length=120
+          - --multi-line=9
+          - --project=generic_connection_pool
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.1.1
+    hooks:
+      - id: mypy
+        stages:
+          - commit
+        name: mypy
+        pass_filenames: false
+        additional_dependencies:
+          - types-psycopg2
+        args: ["--package", "generic_connection_pool"]
