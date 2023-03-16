@@ -119,7 +119,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[asyncio
             timeout: Optional[float] = None,
     ) -> AsyncGenerator[ConnectionT, None]:
         """
-        Acquires a connection form the pool.
+        Acquires a connection from the pool.
 
         :param endpoint: connection endpoint
         :param timeout: number of seconds to wait. If timeout is reached :py:class:`asyncio.TimeoutError` is raised.
@@ -134,7 +134,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[asyncio
 
     async def acquire(self, endpoint: EndpointT, timeout: Optional[float] = None) -> ConnectionT:
         """
-        Acquires a connection form the pool.
+        Acquires a connection from the pool.
 
         :param endpoint: connection endpoint
         :param timeout: number of seconds to wait. If timeout is reached :py:class:`asyncio.TimeoutError` is raised.
