@@ -27,8 +27,13 @@ class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socke
             raise RuntimeError("unsupported address version type: %s", addr.version)
 
         sock = socket.socket(family=family, type=socket.SOCK_STREAM)
+
+        orig_timeout = sock.gettimeout()
         sock.settimeout(timeout)
-        sock.connect((str(addr), port))
+        try:
+            sock.connect((str(addr), port))
+        finally:
+            sock.settimeout(orig_timeout)
 
         return sock
 
@@ -57,8 +62,12 @@ class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, SSLSocket]):
         hostname, port = endpoint
 
         sock = self._ssl.wrap_socket(socket.socket(type=socket.SOCK_STREAM), server_hostname=hostname)
+        orig_timeout = sock.gettimeout()
         sock.settimeout(timeout)
-        sock.connect((hostname, port))
+        try:
+            sock.connect((hostname, port))
+        finally:
+            sock.settimeout(orig_timeout)
 
         return sock
 

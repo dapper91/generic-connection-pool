@@ -123,7 +123,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[threadi
     @contextlib.contextmanager
     def connection(self, endpoint: EndpointT, timeout: Optional[float] = None) -> Generator[ConnectionT, None, None]:
         """
-        Acquires a connection form the pool.
+        Acquires a connection from the pool.
 
         :param endpoint: connection endpoint
         :param timeout: number of seconds to wait. If timeout is reached :py:class:`TimeoutError` is raised.
@@ -138,7 +138,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[threadi
 
     def acquire(self, endpoint: EndpointT, timeout: Optional[float] = None) -> ConnectionT:
         """
-        Acquires a connection form the pool.
+        Acquires a connection from the pool.
 
         :param endpoint: connection endpoint
         :param timeout: number of seconds to wait. If timeout is reached :py:class:`TimeoutError` is raised.
@@ -261,7 +261,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[threadi
             logger.error("connection disposal timed-out: %s", conn_info.endpoint)
             raise
         except Exception as e:
-            logger.exception("connection disposal failed: %s", e)
+            logger.error("connection disposal failed: %s", e)
             return False
 
         logger.debug("connection disposed: %s", conn_info.endpoint)
