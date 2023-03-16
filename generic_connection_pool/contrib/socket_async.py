@@ -54,10 +54,12 @@ class TcpStreamConnectionManager(BaseConnectionManager[TcpStreamEndpoint, TcpStr
 
     async def create(self, endpoint: TcpStreamEndpoint) -> TcpStream:
         hostname, port = endpoint
+        server_hostname = hostname if self._ssl is not None else None
+
         reader, writer = await asyncio.open_connection(
             hostname,
             port,
-            server_hostname=hostname,
+            server_hostname=server_hostname,
             ssl=self._ssl,
         )
 
@@ -65,7 +67,9 @@ class TcpStreamConnectionManager(BaseConnectionManager[TcpStreamEndpoint, TcpStr
 
     async def dispose(self, endpoint: TcpStreamEndpoint, conn: TcpStream) -> None:
         reader, writer = conn
-        writer.write_eof()
+        if writer.can_write_eof():
+            writer.write_eof()
+
         writer.close()
         await writer.wait_closed()
 

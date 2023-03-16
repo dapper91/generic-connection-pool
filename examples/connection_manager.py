@@ -22,8 +22,13 @@ class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, Connection])
         hostname, port = endpoint
 
         sock = self._ssl.wrap_socket(socket.socket(type=socket.SOCK_STREAM), server_hostname=hostname)
+
+        orig_timeout = sock.gettimeout()
         sock.settimeout(timeout)
-        sock.connect((hostname, port))
+        try:
+            sock.connect((hostname, port))
+        finally:
+            sock.settimeout(orig_timeout)
 
         return sock
 
