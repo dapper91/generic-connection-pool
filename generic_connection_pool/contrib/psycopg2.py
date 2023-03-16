@@ -1,4 +1,4 @@
-from typing import Mapping, Optional
+from typing import List, Mapping, Optional
 
 import psycopg2.extensions
 
@@ -6,7 +6,7 @@ from generic_connection_pool.threding import BaseConnectionManager
 
 DbEndpoint = str
 Connection = psycopg2.extensions.connection
-DsnParameters = Mapping[str, Mapping[str, str]]
+DsnParameters = Mapping[DbEndpoint, Mapping[str, str]]
 
 
 class DbConnectionManager(BaseConnectionManager[DbEndpoint, Connection]):
@@ -28,8 +28,14 @@ class DbConnectionManager(BaseConnectionManager[DbEndpoint, Connection]):
     def check_aliveness(self, endpoint: DbEndpoint, conn: Connection, timeout: Optional[float] = None) -> bool:
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
+                query: List[str] = []
+                if timeout is not None:
+                    query.append(f"SET statement_timeout = '{int(timeout)}s';")
+
+                query.append("SELECT 1;")
+                cur.execute(''.join(query))
                 cur.fetchone()
+
         except (psycopg2.Error, OSError):
             return False
 
