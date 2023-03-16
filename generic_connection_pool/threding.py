@@ -261,7 +261,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[threadi
             logger.error("connection disposal timed-out: %s", conn_info.endpoint)
             raise
         except Exception as e:
-            logger.exception("connection disposal failed: %s", e)
+            logger.error("connection disposal failed: %s", e)
             return False
 
         logger.debug("connection disposed: %s", conn_info.endpoint)
