@@ -49,7 +49,7 @@ class TcpStreamConnectionManager(BaseConnectionManager[TcpStreamEndpoint, TcpStr
     TCP stream connection manager.
     """
 
-    def __init__(self, ssl: Union[None, bool, SSLContext]):
+    def __init__(self, ssl: Union[None, bool, SSLContext] = None):
         self._ssl = ssl
 
     async def create(self, endpoint: TcpStreamEndpoint) -> TcpStream:
