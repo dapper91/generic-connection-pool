@@ -128,7 +128,7 @@ async def test_pool_test_context_manager(connection_manager: TestConnectionManag
     await pool.close()
 
 
-async def test_pool_acquire_round_robin(connection_manager: TestConnectionManager):
+async def test_pool_acquire_round_robin(delay: float, connection_manager: TestConnectionManager):
     async def fill_endpoint_pool(pool: ConnectionPool, endpoint: int, size: int) -> List[TestConnection]:
         connections = [await pool.acquire(endpoint) for _ in range(size)]
         for conn in connections:
@@ -148,11 +148,11 @@ async def test_pool_acquire_round_robin(connection_manager: TestConnectionManage
             assert await pool.acquire(endpoint) == conn
             await pool.release(conn, endpoint)
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
-async def test_connection_manager_callbacks(connection_manager: TestConnectionManager):
+async def test_connection_manager_callbacks(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager)
     async with pool.connection(endpoint=1) as conn:
         pass
@@ -160,11 +160,11 @@ async def test_connection_manager_callbacks(connection_manager: TestConnectionMa
     assert connection_manager.acquires == [conn]
     assert connection_manager.releases == [conn]
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
-async def test_connection_wait(sleep_delay: float, connection_manager: TestConnectionManager):
+async def test_connection_wait(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         max_size=1,
@@ -172,23 +172,23 @@ async def test_connection_wait(sleep_delay: float, connection_manager: TestConne
 
     async def acquire_connection(timeout):
         async with pool.connection(endpoint=1, timeout=timeout):
-            await asyncio.sleep(sleep_delay)
+            await asyncio.sleep(delay)
             assert len(pool) == 1
 
     workers_cnt = 10
     for worker in [
-        asyncio.create_task(acquire_connection(timeout=2*workers_cnt*sleep_delay))
+        asyncio.create_task(acquire_connection(timeout=2 * workers_cnt * delay))
         for _ in range(workers_cnt)
     ]:
         await worker
 
     assert len(pool) == 1
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
-async def test_pool_max_size(sleep_delay, connection_manager: TestConnectionManager):
+async def test_pool_max_size(delay, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         min_idle=0,
@@ -199,7 +199,7 @@ async def test_pool_max_size(sleep_delay, connection_manager: TestConnectionMana
 
     conn1 = await pool.acquire(endpoint=1)
     with pytest.raises(asyncio.TimeoutError):
-        await pool.acquire(endpoint=1, timeout=sleep_delay)
+        await pool.acquire(endpoint=1, timeout=delay)
     assert len(pool) == 1
 
     await pool.release(conn1, endpoint=1)
@@ -212,7 +212,7 @@ async def test_pool_max_size(sleep_delay, connection_manager: TestConnectionMana
     await pool.close()
 
 
-async def test_pool_total_max_size(sleep_delay, connection_manager: TestConnectionManager):
+async def test_pool_total_max_size(delay, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         min_idle=0,
@@ -223,7 +223,7 @@ async def test_pool_total_max_size(sleep_delay, connection_manager: TestConnecti
 
     conn1 = await pool.acquire(1)
     with pytest.raises(asyncio.TimeoutError):
-        await pool.acquire(endpoint=2, timeout=sleep_delay)
+        await pool.acquire(endpoint=2, timeout=delay)
     assert len(pool) == 1
 
     await pool.release(conn1, endpoint=1)
@@ -238,7 +238,7 @@ async def test_pool_total_max_size(sleep_delay, connection_manager: TestConnecti
 
 @pytest.mark.parametrize('background_collector', [True, False])
 async def test_pool_disposable_connections_collection(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
@@ -261,7 +261,7 @@ async def test_pool_disposable_connections_collection(
     for endpoint, connection in connections:
         await pool.release(connection, endpoint=endpoint)
 
-    await asyncio.sleep(sleep_delay)
+    await asyncio.sleep(delay)
 
     assert len(pool) == 0
     assert connection_manager.disposals == [conn for ep, conn in connections]
@@ -271,7 +271,7 @@ async def test_pool_disposable_connections_collection(
 
 @pytest.mark.parametrize('background_collector', [True, False])
 async def test_pool_min_idle(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
@@ -299,30 +299,30 @@ async def test_pool_min_idle(
     await pool.release(conn11, endpoint=1)
     await pool.release(conn12, endpoint=1)
     await pool.release(conn13, endpoint=1)
-    await asyncio.sleep(sleep_delay)
+    await asyncio.sleep(delay)
     await pool.release(conn21, endpoint=2)
     await pool.release(conn22, endpoint=2)
-    await asyncio.sleep(sleep_delay)
+    await asyncio.sleep(delay)
     await pool.release(conn31, endpoint=3)
 
-    await asyncio.sleep(sleep_delay)
+    await asyncio.sleep(delay)
 
     assert len(pool) == 3
     assert connection_manager.disposals == [conn11, conn12, conn21]
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
 async def test_pool_idle_timeout(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
-        idle_timeout=sleep_delay,
+        idle_timeout=delay,
         min_idle=1,
         dispose_batch_size=5,
         background_collector=background_collector,
@@ -337,27 +337,27 @@ async def test_pool_idle_timeout(
             pass
     assert len(pool) == 4
 
-    await asyncio.sleep(2*sleep_delay)
+    await asyncio.sleep(2 * delay)
 
     # run disposal if background worker is not started
     async with pool.connection(endpoint=3):
         pass
     assert len(pool) == 3
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
 async def test_pool_max_lifetime(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
-        idle_timeout=sleep_delay,
-        max_lifetime=2*sleep_delay,
+        idle_timeout=delay,
+        max_lifetime=2 * delay,
         min_idle=1,
         dispose_batch_size=4,
         background_collector=background_collector,
@@ -372,18 +372,18 @@ async def test_pool_max_lifetime(
             pass
     assert len(pool) == 4
 
-    await asyncio.sleep(3*sleep_delay)
+    await asyncio.sleep(3 * delay)
 
     # run disposal if background worker is not started
     async with pool.connection(endpoint=3):
         pass
     assert len(pool) == 1
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
-async def test_pool_aliveness_check(connection_manager: TestConnectionManager):
+async def test_pool_aliveness_check(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager)
 
     async with pool.connection(endpoint=1) as conn1:
@@ -397,12 +397,12 @@ async def test_pool_aliveness_check(connection_manager: TestConnectionManager):
     assert len(pool) == 1
     assert connection_manager.dead == [conn1]
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
 async def test_pool_test_close(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](
@@ -422,12 +422,12 @@ async def test_pool_test_close(
             pass
 
     assert len(pool) == 4
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=delay)
     assert len(pool) == 0
 
 
 async def test_pool_test_close_wait(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](
@@ -467,7 +467,7 @@ async def test_pool_test_close_wait(
     while ready < worker_cnt:
         await event.wait()
 
-    await pool.close(graceful_timeout=1.0)
+    await pool.close(graceful_timeout=worker_cnt * delay)
     assert len(pool) == 0
 
     for worker in workers:
@@ -475,7 +475,7 @@ async def test_pool_test_close_wait(
 
 
 async def test_pool_test_close_graceful_timeout(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](connection_manager)
@@ -485,19 +485,19 @@ async def test_pool_test_close_graceful_timeout(
     async def acquire_connection():
         async with pool.connection(endpoint=1):
             acquired.set()
-            await asyncio.sleep(sleep_delay)
+            await asyncio.sleep(delay)
             assert connection_manager.disposals == []
 
     worker = asyncio.create_task(acquire_connection())
 
     await acquired.wait()
-    await pool.close(graceful_timeout=2*sleep_delay)
+    await pool.close(graceful_timeout=2 * delay)
 
     await worker
 
 
 async def test_pool_test_close_timeout(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](connection_manager)
@@ -507,13 +507,13 @@ async def test_pool_test_close_timeout(
     async def acquire_connection():
         async with pool.connection(endpoint=1) as conn:
             acquired.set()
-            await asyncio.sleep(2*sleep_delay)
+            await asyncio.sleep(2 * delay)
             assert connection_manager.disposals == [conn]
 
     worker = asyncio.create_task(acquire_connection())
 
     await acquired.wait()
-    await pool.close(graceful_timeout=0.0, timeout=sleep_delay)
+    await pool.close(graceful_timeout=0.0, timeout=delay)
     assert len(pool) == 1
 
     await worker
@@ -547,12 +547,12 @@ async def test_pool_connection_manager_release_error(connection_manager: TestCon
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
-async def test_pool_connection_manager_aliveness_error(connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_aliveness_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.check_aliveness_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=1.0, min_idle=1)
+    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
     async with pool.connection(endpoint=1):
         pass
 
@@ -564,12 +564,12 @@ async def test_pool_connection_manager_aliveness_error(connection_manager: TestC
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
-async def test_pool_connection_manager_dead_connection_error(connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_dead_connection_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_connection_dead_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=1.0, min_idle=1)
+    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
     async with pool.connection(endpoint=1) as conn:
         pass
 
@@ -582,12 +582,12 @@ async def test_pool_connection_manager_dead_connection_error(connection_manager:
     assert pool.get_endpoint_pool_size(endpoint=1) == 0
 
 
-async def test_pool_connection_manager_acquire_error(connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_acquire_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_acquire_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=1.0, min_idle=1)
+    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
     with pytest.raises(TestException):
         async with pool.connection(endpoint=1):
             pass

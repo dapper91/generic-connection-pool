@@ -95,7 +95,7 @@ def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
     pool.close()
 
 
-def test_tcp_socket_manager_timeout(sleep_delay, port_gen: Generator[int, None, None]):
+def test_tcp_socket_manager_timeout(delay, port_gen: Generator[int, None, None]):
     addr, port = IPv4Address('127.0.0.1'), next(port_gen)
 
     server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
@@ -104,14 +104,15 @@ def test_tcp_socket_manager_timeout(sleep_delay, port_gen: Generator[int, None, 
 
     pool = ConnectionPool(TcpSocketConnectionManager())
     with pytest.raises(TimeoutError):
-        pool.acquire(endpoint=(addr, port), timeout=sleep_delay)
-        pool.acquire(endpoint=(addr, port), timeout=sleep_delay)
+        pool.acquire(endpoint=(addr, port), timeout=delay)
+        pool.acquire(endpoint=(addr, port), timeout=delay)
+        pool.acquire(endpoint=(addr, port), timeout=delay)
 
     pool.close()
     server_sock.close()
 
 
-def test_ssl_socket_manager_timeout(sleep_delay, port_gen: Generator[int, None, None]):
+def test_ssl_socket_manager_timeout(delay, port_gen: Generator[int, None, None]):
     hostname, port = 'localhost', next(port_gen)
 
     server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
@@ -120,8 +121,9 @@ def test_ssl_socket_manager_timeout(sleep_delay, port_gen: Generator[int, None, 
 
     pool = ConnectionPool(SslSocketConnectionManager(ssl.create_default_context()))
     with pytest.raises(TimeoutError):
-        pool.acquire(endpoint=(hostname, port), timeout=sleep_delay)
-        pool.acquire(endpoint=(hostname, port), timeout=sleep_delay)
+        pool.acquire(endpoint=(hostname, port), timeout=delay)
+        pool.acquire(endpoint=(hostname, port), timeout=delay)
+        pool.acquire(endpoint=(hostname, port), timeout=delay)
 
     pool.close()
     server_sock.close()

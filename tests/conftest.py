@@ -21,8 +21,8 @@ def init_random() -> None:
 
 
 @pytest.fixture(scope='session')
-def sleep_delay(pytestconfig) -> float:
-    return pytestconfig.getoption('--sleep-delay', 0.05)
+def delay(pytestconfig) -> float:
+    return pytestconfig.getoption('--delay', 0.05)
 
 
 @pytest.fixture(scope='session')
