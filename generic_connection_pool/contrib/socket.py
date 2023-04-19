@@ -23,7 +23,7 @@ def socket_timeout(sock: socket.socket, timeout: Optional[float]) -> Generator[N
     try:
         yield
     except OSError as e:
-        if str(e) == 'timed out':
+        if 'timed out' in str(e):
             raise TimeoutError
         else:
             raise
