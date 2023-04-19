@@ -14,8 +14,12 @@ TcpEndpoint = Tuple[IpAddress, Port]
 
 @contextlib.contextmanager
 def socket_timeout(sock: socket.socket, timeout: Optional[float]) -> Generator[None, None, None]:
+    if timeout is None:
+        yield
+        return
+
     orig_timeout = sock.gettimeout()
-    sock.settimeout(timeout)
+    sock.settimeout(max(timeout, 1e-6))  # if timeout is 0 set it a small value to prevent non-blocking socket mode
     try:
         yield
     except OSError as e:
