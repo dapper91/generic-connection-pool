@@ -155,16 +155,13 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[asyncio
             dispose_batch_size = self._dispose_batch_size or int(math.log2(self._pool_size + 1)) + 1
             await self._collect_disposable_connections(dispose_batch_size)
 
-    async def close(self, graceful_timeout: Optional[float] = None, timeout: Optional[float] = None) -> None:
+    async def close(self, graceful_timeout: float = 0.0, timeout: Optional[float] = None) -> None:
         """
         Closes the connection pool.
 
-        :param graceful_timeout: timeout within which the pool waits all acquired connection to be released
+        :param graceful_timeout: timeout within which the pool waits for all acquired connection to be released
         :param timeout: timeout after which the pool closes all connection despite they are released or not
         """
-
-        if graceful_timeout is None:
-            graceful_timeout = timeout
 
         if graceful_timeout is not None and timeout is not None:
             assert timeout >= graceful_timeout, "timeout can't be less than graceful_timeout"

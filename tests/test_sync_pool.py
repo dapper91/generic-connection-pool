@@ -478,7 +478,7 @@ def test_pool_test_close_wait(
     while ready < worker_cnt:
         event.wait()
 
-    pool.close(timeout=1.0)
+    pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
     for worker in workers:

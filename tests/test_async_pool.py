@@ -148,7 +148,7 @@ async def test_pool_acquire_round_robin(connection_manager: TestConnectionManage
             assert await pool.acquire(endpoint) == conn
             await pool.release(conn, endpoint)
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -160,7 +160,7 @@ async def test_connection_manager_callbacks(connection_manager: TestConnectionMa
     assert connection_manager.acquires == [conn]
     assert connection_manager.releases == [conn]
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -184,7 +184,7 @@ async def test_connection_wait(sleep_delay: float, connection_manager: TestConne
 
     assert len(pool) == 1
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -310,7 +310,7 @@ async def test_pool_min_idle(
     assert len(pool) == 3
     assert connection_manager.disposals == [conn11, conn12, conn21]
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -344,7 +344,7 @@ async def test_pool_idle_timeout(
         pass
     assert len(pool) == 3
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -379,7 +379,7 @@ async def test_pool_max_lifetime(
         pass
     assert len(pool) == 1
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -397,7 +397,7 @@ async def test_pool_aliveness_check(connection_manager: TestConnectionManager):
     assert len(pool) == 1
     assert connection_manager.dead == [conn1]
 
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -422,7 +422,7 @@ async def test_pool_test_close(
             pass
 
     assert len(pool) == 4
-    await pool.close()
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
 
@@ -467,7 +467,7 @@ async def test_pool_test_close_wait(
     while ready < worker_cnt:
         await event.wait()
 
-    await pool.close(timeout=1.0)
+    await pool.close(graceful_timeout=1.0)
     assert len(pool) == 0
 
     for worker in workers:
