@@ -398,7 +398,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[threadi
                 try:
                     while released:
                         conn_info = released[-1]
-                        self._dispose_connection(conn_info, timeout=graceful_timer.remains)
+                        self._dispose_connection(conn_info, timeout=global_timer.remains)
                         released.pop()
                 except TimeoutError:
                     self._return_released_conns(released)

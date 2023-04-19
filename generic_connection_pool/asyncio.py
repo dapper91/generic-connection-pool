@@ -400,7 +400,7 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[asyncio
                 try:
                     while released:
                         conn_info = released[-1]
-                        await self._dispose_connection(conn_info, timeout=graceful_timer.remains)
+                        await self._dispose_connection(conn_info, timeout=global_timer.remains)
                         released.pop()
                 except asyncio.TimeoutError:
                     await asyncio.shield(self._return_released_conns(released))

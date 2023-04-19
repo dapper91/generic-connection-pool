@@ -42,7 +42,7 @@ class Timer:
         if self._timeout is None:
             return None
 
-        return self._timeout - self.elapsed
+        return max(0.0, self._timeout - self.elapsed)
 
     @property
     def timedout(self) -> bool:
