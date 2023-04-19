@@ -100,9 +100,11 @@ def test_tcp_socket_manager_timeout(sleep_delay, port_gen: Generator[int, None, 
 
     server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     server_sock.bind((str(addr), port))
+    server_sock.listen(1)
 
     pool = ConnectionPool(TcpSocketConnectionManager())
     with pytest.raises(TimeoutError):
+        pool.acquire(endpoint=(addr, port), timeout=sleep_delay)
         pool.acquire(endpoint=(addr, port), timeout=sleep_delay)
 
     pool.close()
@@ -114,9 +116,11 @@ def test_ssl_socket_manager_timeout(sleep_delay, port_gen: Generator[int, None, 
 
     server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     server_sock.bind((hostname, port))
+    server_sock.listen(1)
 
     pool = ConnectionPool(SslSocketConnectionManager(ssl.create_default_context()))
     with pytest.raises(TimeoutError):
+        pool.acquire(endpoint=(hostname, port), timeout=sleep_delay)
         pool.acquire(endpoint=(hostname, port), timeout=sleep_delay)
 
     pool.close()
