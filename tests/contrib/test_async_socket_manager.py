@@ -2,48 +2,72 @@ import asyncio
 import ssl
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Tuple
+from typing import AsyncGenerator, Generator, Optional, Tuple
 
 import pytest
-import pytest_asyncio.plugin
 
 from generic_connection_pool.asyncio import ConnectionPool
 from generic_connection_pool.contrib.socket_async import TcpSocketConnectionManager, TcpStreamConnectionManager
 
 
-@pytest.fixture
-async def tcp_server(request: pytest_asyncio.plugin.SubRequest, resource_dir: Path):
-    params = getattr(request, 'param', {})
-    user_ssl = params.get('use_ssl', False)
-
-    if user_ssl:
-        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        context.load_cert_chain(resource_dir / 'ssl.cert', resource_dir / 'ssl.key')
-    else:
-        context = None
-
-    hostname, addr, port = 'localhost', IPv4Address('127.0.0.1'),  10000
-
-    async def echo(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        data = await reader.read(1024)
+class TCPServer:
+    @staticmethod
+    async def echo_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        data = await reader.read(1500)
         writer.write(data)
         await writer.drain()
         writer.close()
         await writer.wait_closed()
 
-    async with (server := await asyncio.start_server(echo, host=hostname, port=port, ssl=context, reuse_port=True)):
-        server_task = asyncio.create_task(server.serve_forever())
-        yield hostname, addr, port
-        server_task.cancel()
-        try:
-            await server_task
-        except asyncio.CancelledError:
-            pass
+    def __init__(self, hostname: str, port: int, ssl_ctx: Optional[ssl.SSLContext] = None):
+        self._hostname = hostname
+        self._port = port
+        self._ssl_ctx = ssl_ctx
+        self._server_task: Optional[asyncio.Task[None]] = None
+
+    async def start(self) -> None:
+        server = await asyncio.start_server(
+            self.echo_handler,
+            host=self._hostname,
+            port=self._port,
+            ssl=self._ssl_ctx,
+            reuse_port=True,
+        )
+        self._server_task = asyncio.create_task(server.serve_forever())
+
+    async def stop(self) -> None:
+        if (server_task := self._server_task) is not None:
+            server_task.cancel()
+            try:
+                await server_task
+            except asyncio.CancelledError:
+                pass
 
 
-async def test_tcp_socket_manager(tcp_server: Tuple[str, IPv4Address, int]):
+@pytest.fixture
+async def tcp_server(port_gen: Generator[int, None, None]) -> AsyncGenerator[Tuple[IPv4Address, int], None]:
+    addr, port = IPv4Address('127.0.0.1'), next(port_gen)
+    server = TCPServer(str(addr), port)
+    await server.start()
+    yield addr, port
+    await server.stop()
+
+
+@pytest.fixture
+async def ssl_server(resource_dir: Path, port_gen: Generator[int, None, None]) -> AsyncGenerator[Tuple[str, int], None]:
+    hostname, port = 'localhost', next(port_gen)
+    ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_ctx.load_cert_chain(resource_dir / 'ssl.cert', resource_dir / 'ssl.key')
+
+    server = TCPServer(hostname, port, ssl_ctx=ssl_ctx)
+    await server.start()
+    yield hostname, port
+    await server.stop()
+
+
+async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     loop = asyncio.get_running_loop()
-    hostname, addr, port = tcp_server
+    addr, port = tcp_server
 
     pool = ConnectionPool(TcpSocketConnectionManager())
     async with pool.connection((addr, port)) as sock:
@@ -55,20 +79,23 @@ async def test_tcp_socket_manager(tcp_server: Tuple[str, IPv4Address, int]):
     await pool.close()
 
 
-@pytest.mark.parametrize(
-    'use_ssl, tcp_server', [
-        (True, {'use_ssl': True}),
-        (False, {'use_ssl': False}),
-    ],
-    indirect=['tcp_server'],
-)
-async def test_ssl_stream_manager(resource_dir: Path, use_ssl: bool, tcp_server: Tuple[str, IPv4Address, int]):
-    hostname, addr, port = tcp_server
+async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Address, int]):
+    addr, port = tcp_server
 
-    if use_ssl:
-        ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
-    else:
-        ssl_context = None
+    pool = ConnectionPool(TcpStreamConnectionManager(ssl=None))
+    async with pool.connection((str(addr), port)) as (reader, writer):
+        request = b'test'
+        writer.write(request)
+        await writer.drain()
+        response = await reader.read()
+        assert response == request
+
+    await pool.close()
+
+
+async def test_ssl_stream_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
+    hostname, port = ssl_server
+    ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
 
     pool = ConnectionPool(TcpStreamConnectionManager(ssl_context))
     async with pool.connection((hostname, port)) as (reader, writer):

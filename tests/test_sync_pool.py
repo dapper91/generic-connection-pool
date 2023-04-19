@@ -165,7 +165,7 @@ def test_connection_manager_callbacks(connection_manager: TestConnectionManager)
     assert len(pool) == 0
 
 
-def test_connection_wait(sleep_delay: float, connection_manager: TestConnectionManager):
+def test_connection_wait(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         max_size=1,
@@ -173,12 +173,12 @@ def test_connection_wait(sleep_delay: float, connection_manager: TestConnectionM
 
     def acquire_connection(timeout):
         with pool.connection(endpoint=1, timeout=timeout):
-            time.sleep(sleep_delay)
+            time.sleep(delay)
             assert len(pool) == 1
 
     workers_cnt = 10
     workers = [
-        threading.Thread(target=acquire_connection(timeout=(workers_cnt + 1) * sleep_delay))
+        threading.Thread(target=acquire_connection(timeout=(workers_cnt + 1) * delay))
         for _ in range(workers_cnt)
     ]
     for worker in workers:
@@ -193,7 +193,7 @@ def test_connection_wait(sleep_delay: float, connection_manager: TestConnectionM
     assert len(pool) == 0
 
 
-def test_pool_max_size(sleep_delay, connection_manager: TestConnectionManager):
+def test_pool_max_size(delay, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         min_idle=0,
@@ -204,7 +204,7 @@ def test_pool_max_size(sleep_delay, connection_manager: TestConnectionManager):
 
     conn1 = pool.acquire(endpoint=1)
     with pytest.raises(TimeoutError):
-        pool.acquire(endpoint=1, timeout=sleep_delay)
+        pool.acquire(endpoint=1, timeout=delay)
     assert len(pool) == 1
 
     pool.release(conn1, endpoint=1)
@@ -217,7 +217,7 @@ def test_pool_max_size(sleep_delay, connection_manager: TestConnectionManager):
     pool.close()
 
 
-def test_pool_total_max_size(sleep_delay, connection_manager: TestConnectionManager):
+def test_pool_total_max_size(delay, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         min_idle=0,
@@ -228,7 +228,7 @@ def test_pool_total_max_size(sleep_delay, connection_manager: TestConnectionMana
 
     conn1 = pool.acquire(1)
     with pytest.raises(TimeoutError):
-        pool.acquire(endpoint=2, timeout=sleep_delay)
+        pool.acquire(endpoint=2, timeout=delay)
     assert len(pool) == 1
 
     pool.release(conn1, endpoint=1)
@@ -243,7 +243,7 @@ def test_pool_total_max_size(sleep_delay, connection_manager: TestConnectionMana
 
 @pytest.mark.parametrize('background_collector', [True, False])
 def test_pool_disposable_connections_collection(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
@@ -266,7 +266,7 @@ def test_pool_disposable_connections_collection(
     for endpoint, connection in connections:
         pool.release(connection, endpoint=endpoint)
 
-    time.sleep(sleep_delay)
+    time.sleep(delay)
 
     assert len(pool) == 0
     assert connection_manager.disposals == [conn for ep, conn in connections]
@@ -276,7 +276,7 @@ def test_pool_disposable_connections_collection(
 
 @pytest.mark.parametrize('background_collector', [True, False])
 def test_pool_min_idle(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
@@ -304,13 +304,13 @@ def test_pool_min_idle(
     pool.release(conn11, endpoint=1)
     pool.release(conn12, endpoint=1)
     pool.release(conn13, endpoint=1)
-    time.sleep(sleep_delay)
+    time.sleep(delay)
     pool.release(conn21, endpoint=2)
     pool.release(conn22, endpoint=2)
-    time.sleep(sleep_delay)
+    time.sleep(delay)
     pool.release(conn31, endpoint=3)
 
-    time.sleep(sleep_delay)
+    time.sleep(delay)
 
     assert len(pool) == 3
     assert connection_manager.disposals == [conn11, conn12, conn21]
@@ -321,13 +321,13 @@ def test_pool_min_idle(
 
 @pytest.mark.parametrize('background_collector', [True, False])
 def test_pool_idle_timeout(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
-        idle_timeout=sleep_delay,
+        idle_timeout=delay,
         min_idle=1,
         dispose_batch_size=5,
         background_collector=background_collector,
@@ -342,7 +342,7 @@ def test_pool_idle_timeout(
             pass
     assert len(pool) == 4
 
-    time.sleep(2*sleep_delay)
+    time.sleep(2 * delay)
 
     # run disposal if background worker is not started
     with pool.connection(endpoint=3):
@@ -355,14 +355,14 @@ def test_pool_idle_timeout(
 
 @pytest.mark.parametrize('background_collector', [True, False])
 def test_pool_max_lifetime(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
         background_collector: bool,
 ):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
-        idle_timeout=sleep_delay,
-        max_lifetime=2*sleep_delay,
+        idle_timeout=delay,
+        max_lifetime=2 * delay,
         min_idle=1,
         dispose_batch_size=4,
         background_collector=background_collector,
@@ -377,7 +377,7 @@ def test_pool_max_lifetime(
             pass
     assert len(pool) == 4
 
-    time.sleep(3*sleep_delay)
+    time.sleep(3 * delay)
 
     # run disposal if background worker is not started
     with pool.connection(endpoint=3):
@@ -407,7 +407,7 @@ def test_pool_aliveness_check(connection_manager: TestConnectionManager):
 
 
 def test_pool_test_close(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](
@@ -432,7 +432,7 @@ def test_pool_test_close(
 
 
 def test_pool_test_close_wait(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](
@@ -478,7 +478,7 @@ def test_pool_test_close_wait(
     while ready < worker_cnt:
         event.wait()
 
-    pool.close(timeout=1.0)
+    pool.close(graceful_timeout=worker_cnt * delay)
     assert len(pool) == 0
 
     for worker in workers:
@@ -486,7 +486,7 @@ def test_pool_test_close_wait(
 
 
 def test_pool_test_close_graceful_timeout(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](connection_manager)
@@ -496,20 +496,20 @@ def test_pool_test_close_graceful_timeout(
     def acquire_connection():
         with pool.connection(endpoint=1):
             acquired.set()
-            time.sleep(sleep_delay)
+            time.sleep(delay)
             assert connection_manager.disposals == []
 
     worker = threading.Thread(target=acquire_connection)
     worker.start()
 
     acquired.wait()
-    pool.close(graceful_timeout=2*sleep_delay)
+    pool.close(graceful_timeout=2 * delay)
 
     worker.join()
 
 
 def test_pool_test_close_timeout(
-        sleep_delay: float,
+        delay: float,
         connection_manager: TestConnectionManager,
 ):
     pool = ConnectionPool[int, TestConnection](connection_manager)
@@ -519,14 +519,14 @@ def test_pool_test_close_timeout(
     def acquire_connection():
         with pool.connection(endpoint=1) as conn:
             acquired.set()
-            time.sleep(2*sleep_delay)
+            time.sleep(2 * delay)
             assert connection_manager.disposals == [conn]
 
     worker = threading.Thread(target=acquire_connection)
     worker.start()
 
     acquired.wait()
-    pool.close(graceful_timeout=0.0, timeout=sleep_delay)
+    pool.close(graceful_timeout=0.0, timeout=delay)
     assert len(pool) == 1
 
     worker.join()
@@ -560,12 +560,12 @@ def test_pool_connection_manager_release_error(connection_manager: TestConnectio
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
-def test_pool_connection_manager_aliveness_error(connection_manager: TestConnectionManager):
+def test_pool_connection_manager_aliveness_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.check_aliveness_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=1.0, min_idle=1)
+    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
     with pool.connection(endpoint=1):
         pass
 
@@ -577,12 +577,12 @@ def test_pool_connection_manager_aliveness_error(connection_manager: TestConnect
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
-def test_pool_connection_manager_dead_connection_error(connection_manager: TestConnectionManager):
+def test_pool_connection_manager_dead_connection_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_connection_dead_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=1.0, min_idle=1)
+    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
     with pool.connection(endpoint=1) as conn:
         pass
 
@@ -595,12 +595,12 @@ def test_pool_connection_manager_dead_connection_error(connection_manager: TestC
     assert pool.get_endpoint_pool_size(endpoint=1) == 0
 
 
-def test_pool_connection_manager_acquire_error(connection_manager: TestConnectionManager):
+def test_pool_connection_manager_acquire_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_acquire_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=1.0, min_idle=1)
+    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
     with pytest.raises(TestException):
         with pool.connection(endpoint=1):
             pass

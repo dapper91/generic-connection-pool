@@ -1,7 +1,8 @@
+import contextlib
 import socket
 from ipaddress import IPv4Address, IPv6Address
 from ssl import SSLContext, SSLSocket
-from typing import Optional, Tuple, Union
+from typing import Generator, Optional, Tuple, Union
 
 from generic_connection_pool.threding import BaseConnectionManager
 
@@ -9,6 +10,25 @@ IpAddress = Union[IPv4Address, IPv6Address]
 Hostname = str
 Port = int
 TcpEndpoint = Tuple[IpAddress, Port]
+
+
+@contextlib.contextmanager
+def socket_timeout(sock: socket.socket, timeout: Optional[float]) -> Generator[None, None, None]:
+    if timeout is None:
+        yield
+        return
+
+    orig_timeout = sock.gettimeout()
+    sock.settimeout(max(timeout, 1e-6))  # if timeout is 0 set it a small value to prevent non-blocking socket mode
+    try:
+        yield
+    except OSError as e:
+        if 'timed out' in str(e):
+            raise TimeoutError
+        else:
+            raise
+    finally:
+        sock.settimeout(orig_timeout)
 
 
 class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socket]):
@@ -28,17 +48,12 @@ class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socke
 
         sock = socket.socket(family=family, type=socket.SOCK_STREAM)
 
-        orig_timeout = sock.gettimeout()
-        sock.settimeout(timeout)
-        try:
+        with socket_timeout(sock, timeout):
             sock.connect((str(addr), port))
-        finally:
-            sock.settimeout(orig_timeout)
 
         return sock
 
     def dispose(self, endpoint: TcpEndpoint, conn: socket.socket, timeout: Optional[float] = None) -> None:
-        conn.settimeout(timeout)
         try:
             conn.shutdown(socket.SHUT_RDWR)
         except OSError:
@@ -62,17 +77,13 @@ class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, SSLSocket]):
         hostname, port = endpoint
 
         sock = self._ssl.wrap_socket(socket.socket(type=socket.SOCK_STREAM), server_hostname=hostname)
-        orig_timeout = sock.gettimeout()
-        sock.settimeout(timeout)
-        try:
+
+        with socket_timeout(sock, timeout):
             sock.connect((hostname, port))
-        finally:
-            sock.settimeout(orig_timeout)
 
         return sock
 
     def dispose(self, endpoint: SslEndpoint, conn: SSLSocket, timeout: Optional[float] = None) -> None:
-        conn.settimeout(timeout)
         try:
             conn.shutdown(socket.SHUT_RDWR)
         except OSError:
