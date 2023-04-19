@@ -419,5 +419,5 @@ class ConnectionPool(Generic[EndpointT, ConnectionT], BaseConnectionPool[asyncio
             for conn_info in released:
                 pool = self._pools[conn_info.endpoint]
                 pool.queue[conn_info.conn] = conn_info
-                pool.access_queue.remove((conn_info.accessed_at, conn_info.conn))
+                pool.access_queue.push((conn_info.accessed_at, conn_info.conn))
                 self._pool_size += 1
