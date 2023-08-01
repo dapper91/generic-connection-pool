@@ -115,7 +115,7 @@ Since the pool has generic nature is can be used for database connections as wel
     import psycopg2.extensions
 
     from generic_connection_pool.contrib.psycopg2 import DbConnectionManager
-    from generic_connection_pool.threding import ConnectionPool
+    from generic_connection_pool.threading import ConnectionPool
 
     Endpoint = str
     Connection = psycopg2.extensions.connection
@@ -168,7 +168,7 @@ If built-in connection managers are not suitable for your task the one can be ea
     from ssl import SSLContext, SSLSocket
     from typing import Optional, Tuple
 
-    from generic_connection_pool.threding import BaseConnectionManager, ConnectionPool
+    from generic_connection_pool.threading import BaseConnectionManager, ConnectionPool
 
     Hostname = str
     Port = int

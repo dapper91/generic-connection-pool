@@ -41,22 +41,32 @@ class ExtHeap(Generic[Item]):
         self._heap.clear()
         self._index.clear()
 
-    def push(self, item: Item) -> None:
+    def insert(self, item: Item) -> None:
         """
-        Pushes an item onto the heap, maintaining the heap invariant.
-        If the item already presented raises `ValueError`.
+        Inserts an item onto the heap, maintaining the heap invariant.
+        If the item already presented raises `KeyError`.
 
         :param item: item to be pushed
         """
 
         if item in self._index:
-            raise ValueError("item already exists")
+            raise KeyError("item already exists")
 
         item_idx = len(self._heap)
         self._heap.append(item)
         self._index[item] = item_idx
 
         self._siftdown(item_idx)
+
+    def insert_or_replace(self, item: Item) -> None:
+        """
+        Inserts an item onto the heap or replaces it if it already exists.
+        """
+
+        if item in self._index:
+            self.remove(item)
+
+        self.insert(item)
 
     def pop(self) -> Optional[Item]:
         """
@@ -91,13 +101,12 @@ class ExtHeap(Generic[Item]):
     def remove(self, item: Item) -> None:
         """
         Removes an item from the heap.
-        If the item already presented raises `ValueError`.
 
         :param item: item to be removed
         """
 
         if item not in self._index:
-            raise ValueError("item not found")
+            return
 
         idx = self._index.pop(item)
         if idx == len(self._heap) - 1:
@@ -112,18 +121,18 @@ class ExtHeap(Generic[Item]):
     def replace(self, old_item: Item, new_item: Item) -> None:
         """
         Replaces an item with the new one, maintaining the heap invariant.
-        If the old_item not presented raises `ValueError`.
-        If the new_item already presented raises `ValueError`.
+        If the old_item not presented raises `KeyError`.
+        If the new_item already presented raises `KeyError`.
 
         :param old_item: item to be replaces
-        :param new_item: item the old one is replaces by
+        :param new_item: item the old one is replaced by
         """
 
         if old_item not in self._index:
-            raise ValueError("item not found")
+            raise KeyError("item not found")
 
         if new_item in self._index:
-            raise ValueError("item already exists")
+            raise KeyError("item already exists")
 
         old_idx = self._index.pop(old_item)
         self._heap[old_idx] = new_item

@@ -1,3 +1,4 @@
+import contextlib
 import itertools as it
 import random
 import threading
@@ -6,7 +7,8 @@ from typing import Dict, List, Optional, Tuple
 
 import pytest
 
-from generic_connection_pool.threding import BaseConnectionManager, ConnectionPool
+from generic_connection_pool import exceptions
+from generic_connection_pool.threading import BaseConnectionManager, ConnectionPool
 
 
 class TestConnection:
@@ -36,7 +38,7 @@ class TestConnectionManager(BaseConnectionManager[int, TestConnection]):
         self.on_release_err: Optional[Exception] = None
         self.on_connection_dead_err: Optional[Exception] = None
 
-        self._conn_cnt = 0
+        self._conn_cnt = 1
 
     def create(self, endpoint: int, timeout: Optional[float] = None) -> TestConnection:
         if err := self.create_err:
@@ -107,23 +109,23 @@ def test_params(connection_manager: TestConnectionManager):
     assert pool.total_max_size == total_max_size
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
-def test_pool_test_context_manager(connection_manager: TestConnectionManager):
+def test_pool_context_manager(connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager, min_idle=0, idle_timeout=0.0)
 
     with pool.connection(endpoint=1) as conn1:
-        assert len(pool) == 1
+        assert pool.get_size() == 1
 
         with pool.connection(endpoint=2) as conn2:
-            assert len(pool) == 2
+            assert pool.get_size() == 2
 
             with pool.connection(endpoint=3) as conn3:
-                assert len(pool) == 3
+                assert pool.get_size() == 3
 
     assert connection_manager.creations == [(1, conn1), (2, conn2), (3, conn3)]
-    assert len(pool) == 0
+    assert pool.get_size() == 0
     assert connection_manager.disposals == [conn3, conn2, conn1]
 
     pool.close()
@@ -150,7 +152,7 @@ def test_pool_acquire_round_robin(connection_manager: TestConnectionManager):
             pool.release(conn, endpoint)
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
 def test_connection_manager_callbacks(connection_manager: TestConnectionManager):
@@ -162,7 +164,7 @@ def test_connection_manager_callbacks(connection_manager: TestConnectionManager)
     assert connection_manager.releases == [conn]
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
 def test_connection_wait(delay: float, connection_manager: TestConnectionManager):
@@ -174,23 +176,23 @@ def test_connection_wait(delay: float, connection_manager: TestConnectionManager
     def acquire_connection(timeout):
         with pool.connection(endpoint=1, timeout=timeout):
             time.sleep(delay)
-            assert len(pool) == 1
+            assert pool.get_size() == 1
 
-    workers_cnt = 10
-    workers = [
-        threading.Thread(target=acquire_connection(timeout=(workers_cnt + 1) * delay))
-        for _ in range(workers_cnt)
+    threads_cnt = 10
+    threads = [
+        threading.Thread(target=acquire_connection(timeout=(threads_cnt + 1) * delay))
+        for _ in range(threads_cnt)
     ]
-    for worker in workers:
-        worker.start()
+    for thread in threads:
+        thread.start()
 
-    for worker in workers:
-        worker.join()
+    for thread in threads:
+        thread.join()
 
-    assert len(pool) == 1
+    assert pool.get_size() == 1
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
 def test_pool_max_size(delay, connection_manager: TestConnectionManager):
@@ -205,14 +207,14 @@ def test_pool_max_size(delay, connection_manager: TestConnectionManager):
     conn1 = pool.acquire(endpoint=1)
     with pytest.raises(TimeoutError):
         pool.acquire(endpoint=1, timeout=delay)
-    assert len(pool) == 1
+    assert pool.get_size() == 1
 
     pool.release(conn1, endpoint=1)
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
     conn1 = pool.acquire(endpoint=1)
     pool.release(conn1, endpoint=1)
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
     pool.close()
 
@@ -229,14 +231,14 @@ def test_pool_total_max_size(delay, connection_manager: TestConnectionManager):
     conn1 = pool.acquire(1)
     with pytest.raises(TimeoutError):
         pool.acquire(endpoint=2, timeout=delay)
-    assert len(pool) == 1
+    assert pool.get_size() == 1
 
     pool.release(conn1, endpoint=1)
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
     conn1 = pool.acquire(endpoint=1)
     pool.release(conn1, endpoint=1)
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
     pool.close()
 
@@ -259,7 +261,7 @@ def test_pool_disposable_connections_collection(
         (endpoint := n % 3, pool.acquire(endpoint=endpoint))
         for n in range(20)
     ]
-    assert len(pool) == len(connections)
+    assert pool.get_size() == len(connections)
 
     assert connection_manager.creations == connections
 
@@ -268,7 +270,7 @@ def test_pool_disposable_connections_collection(
 
     time.sleep(delay)
 
-    assert len(pool) == 0
+    assert pool.get_size() == 0
     assert connection_manager.disposals == [conn for ep, conn in connections]
 
     pool.close()
@@ -293,7 +295,7 @@ def test_pool_min_idle(
     conn22 = pool.acquire(endpoint=2)
     conn31 = pool.acquire(endpoint=3)
 
-    assert len(pool) == 6
+    assert pool.get_size() == 6
 
     assert connection_manager.creations == [
         (1, conn11), (1, conn12), (1, conn13),
@@ -312,11 +314,11 @@ def test_pool_min_idle(
 
     time.sleep(delay)
 
-    assert len(pool) == 3
+    assert pool.get_size() == 3
     assert connection_manager.disposals == [conn11, conn12, conn21]
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
@@ -340,17 +342,43 @@ def test_pool_idle_timeout(
     with pool.connection(endpoint=2):
         with pool.connection(endpoint=2):
             pass
-    assert len(pool) == 4
+    assert pool.get_size() == 4
 
     time.sleep(2 * delay)
 
     # run disposal if background worker is not started
     with pool.connection(endpoint=3):
         pass
-    assert len(pool) == 3
+    assert pool.get_size() == 3
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
+
+
+def test_idle_connection_close_on_total_max_size_exceeded(connection_manager: TestConnectionManager):
+    pool = ConnectionPool[int, TestConnection](
+        connection_manager,
+        min_idle=3,
+        max_size=3,
+        total_max_size=3,
+    )
+
+    with pool.connection(endpoint=1):
+        with pool.connection(endpoint=1):
+            with pool.connection(endpoint=1):
+                pass
+    assert pool.get_size() == 3
+
+    with pool.connection(endpoint=2):
+        pass
+    assert pool.get_size() == 3
+
+    with pool.connection(endpoint=3):
+        pass
+    assert pool.get_size() == 3
+
+    pool.close()
+    assert pool.get_size() == 0
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
@@ -375,17 +403,17 @@ def test_pool_max_lifetime(
     with pool.connection(endpoint=2):
         with pool.connection(endpoint=2):
             pass
-    assert len(pool) == 4
+    assert pool.get_size() == 4
 
     time.sleep(3 * delay)
 
     # run disposal if background worker is not started
     with pool.connection(endpoint=3):
         pass
-    assert len(pool) == 1
+    assert pool.get_size() == 1
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
 def test_pool_aliveness_check(connection_manager: TestConnectionManager):
@@ -399,14 +427,14 @@ def test_pool_aliveness_check(connection_manager: TestConnectionManager):
     with pool.connection(endpoint=1) as conn2:
         assert conn2 != conn1
 
-    assert len(pool) == 1
+    assert pool.get_size() == 1
     assert connection_manager.dead == [conn1]
 
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
-def test_pool_test_close(
+def test_pool_close(
         delay: float,
         connection_manager: TestConnectionManager,
 ):
@@ -426,12 +454,12 @@ def test_pool_test_close(
         with pool.connection(endpoint=2):
             pass
 
-    assert len(pool) == 4
+    assert pool.get_size() == 4
     pool.close()
-    assert len(pool) == 0
+    assert pool.get_size() == 0
 
 
-def test_pool_test_close_wait(
+def test_pool_close_wait(
         delay: float,
         connection_manager: TestConnectionManager,
 ):
@@ -445,47 +473,39 @@ def test_pool_test_close_wait(
         background_collector=False,
     )
 
-    worker_cnt = 50
+    thread_cnt = 10
     endpoint_cnt = 6
     delay_factor = 0.2
 
-    ready = 0
-    event = threading.Event()
+    barrier = threading.Barrier(thread_cnt + 1)
 
     def acquire_connection(endpoint, delay):
-        nonlocal ready
+        with contextlib.suppress(exceptions.ConnectionPoolClosedError):
+            with pool.connection(endpoint=endpoint):
+                barrier.wait()
+                time.sleep(delay)
 
-        with pool.connection(endpoint=endpoint):
-            ready += 1
-            event.set()
-            while ready < worker_cnt:
-                event.wait()
-                event.clear()
-
-            time.sleep(delay)
-
-    workers = [
+    threads = [
         threading.Thread(
             target=acquire_connection,
             kwargs=dict(endpoint=i % endpoint_cnt, delay=random.random() * delay_factor),
         )
-        for i in range(worker_cnt)
+        for i in range(thread_cnt)
     ]
 
-    for worker in workers:
-        worker.start()
+    for thread in threads:
+        thread.start()
 
-    while ready < worker_cnt:
-        event.wait()
+    barrier.wait()
 
-    pool.close(graceful_timeout=worker_cnt * delay)
-    assert len(pool) == 0
+    pool.close(timeout=thread_cnt * delay)
+    assert pool.get_size() == 0
 
-    for worker in workers:
-        worker.join()
+    for thread in threads:
+        thread.join()
 
 
-def test_pool_test_close_graceful_timeout(
+def test_pool_close_timeout(
         delay: float,
         connection_manager: TestConnectionManager,
 ):
@@ -494,42 +514,19 @@ def test_pool_test_close_graceful_timeout(
     acquired = threading.Event()
 
     def acquire_connection():
-        with pool.connection(endpoint=1):
-            acquired.set()
-            time.sleep(delay)
-            assert connection_manager.disposals == []
+        with contextlib.suppress(exceptions.ConnectionPoolClosedError):
+            with pool.connection(endpoint=1):
+                acquired.set()
+                time.sleep(delay)
+                assert connection_manager.disposals == []
 
-    worker = threading.Thread(target=acquire_connection)
-    worker.start()
-
-    acquired.wait()
-    pool.close(graceful_timeout=2 * delay)
-
-    worker.join()
-
-
-def test_pool_test_close_timeout(
-        delay: float,
-        connection_manager: TestConnectionManager,
-):
-    pool = ConnectionPool[int, TestConnection](connection_manager)
-
-    acquired = threading.Event()
-
-    def acquire_connection():
-        with pool.connection(endpoint=1) as conn:
-            acquired.set()
-            time.sleep(2 * delay)
-            assert connection_manager.disposals == [conn]
-
-    worker = threading.Thread(target=acquire_connection)
-    worker.start()
+    thread = threading.Thread(target=acquire_connection)
+    thread.start()
 
     acquired.wait()
-    pool.close(graceful_timeout=0.0, timeout=delay)
-    assert len(pool) == 1
+    pool.close(timeout=2 * delay)
 
-    worker.join()
+    thread.join()
 
 
 def test_pool_connection_manager_creation_error(connection_manager: TestConnectionManager):
@@ -542,7 +539,7 @@ def test_pool_connection_manager_creation_error(connection_manager: TestConnecti
         with pool.connection(endpoint=1):
             pass
 
-    assert len(pool) == 0
+    assert pool.get_size() == 0
     assert pool.get_endpoint_pool_size(endpoint=1) == 0
 
 
@@ -556,7 +553,7 @@ def test_pool_connection_manager_release_error(connection_manager: TestConnectio
         with pool.connection(endpoint=1):
             pass
 
-    assert len(pool) == 1
+    assert pool.get_size() == 1
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
@@ -573,7 +570,7 @@ def test_pool_connection_manager_aliveness_error(delay: float, connection_manage
         with pool.connection(endpoint=1):
             pass
 
-    assert len(pool) == 1
+    assert pool.get_size() == 1
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
@@ -591,7 +588,7 @@ def test_pool_connection_manager_dead_connection_error(delay: float, connection_
         with pool.connection(endpoint=1):
             pass
 
-    assert len(pool) == 0
+    assert pool.get_size() == 0
     assert pool.get_endpoint_pool_size(endpoint=1) == 0
 
 
@@ -605,7 +602,7 @@ def test_pool_connection_manager_acquire_error(delay: float, connection_manager:
         with pool.connection(endpoint=1):
             pass
 
-    assert len(pool) == 1
+    assert pool.get_size() == 1
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
@@ -618,5 +615,5 @@ def test_pool_connection_manager_dispose_error(connection_manager: TestConnectio
     with pool.connection(endpoint=1):
         pass
 
-    assert len(pool) == 0
+    assert pool.get_size() == 0
     assert pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 0

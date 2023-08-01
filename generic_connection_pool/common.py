@@ -1,11 +1,11 @@
 import dataclasses as dc
-import functools as ft
 import logging
 import time
-import typing
-from collections import OrderedDict, defaultdict
-from typing import Callable, Dict, Generic, Hashable, Optional, Tuple, TypeVar
+from collections import OrderedDict
+from enum import IntEnum
+from typing import Dict, Generic, Hashable, Optional, Tuple, TypeVar
 
+from . import exceptions
 from .heap import ExtHeap
 
 logger = logging.getLogger(__package__)
@@ -60,8 +60,8 @@ class Timer:
 class ConnectionInfo(Generic[EndpointT, ConnectionT]):
     endpoint: EndpointT
     conn: ConnectionT
-    accessed_at: float
-    created_at: float
+    accessed_at: float = dc.field(default_factory=time.monotonic)
+    created_at: float = dc.field(default_factory=time.monotonic)
     acquires: int = 0
 
     @property
@@ -73,129 +73,282 @@ class ConnectionInfo(Generic[EndpointT, ConnectionT]):
         return time.monotonic() - self.accessed_at
 
 
-@ft.total_ordering
-@dc.dataclass(frozen=True)
-class Event:
-    timestamp: float = dc.field(hash=False)
+class BaseEndpointPool(Generic[EndpointT, ConnectionT]):
+    """
+    Base endpoint pool. Contains information about connections related to a particular endpoint.
+    """
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Event):
-            return NotImplemented
+    def __init__(self, max_pool_size: int, max_extra_size: int):
+        """
+        :param max_pool_size: connection pool max size
+        :param max_extra_size: extra connection pool max size
+        """
 
-        return self.timestamp == other.timestamp
+        self._max_pool_size = max_pool_size
+        self._max_extra_size = max_extra_size
 
-    def __lt__(self, other: object) -> bool:
-        if not isinstance(other, Event):
-            return NotImplemented
+        # connections from this pool are kept open util theirs lifetime expires;
+        # they are acquired using FIFO (round-robin) strategy
+        self._pool: OrderedDict[ConnectionT, ConnectionInfo[EndpointT, ConnectionT]] = OrderedDict()
+        # connections from this pool are closed after idle-time expires; they are acquired using LIFO strategy
+        # to recycle extra connections as soon as possible since they are recycled based on last access time
+        self._extra: OrderedDict[ConnectionT, ConnectionInfo[EndpointT, ConnectionT]] = OrderedDict()
+        # acquired connections
+        self._acquired: Dict[ConnectionT, ConnectionInfo[EndpointT, ConnectionT]] = dict()
+        # number of reserved connections (to be established)
+        self._reserved = 0
 
-        return self.timestamp < other.timestamp
+    @property
+    def max_size(self) -> int:
+        """
+        Returns pool max size.
+        """
 
+        return self._max_pool_size + self._max_extra_size
 
-@dc.dataclass(frozen=True)
-class LifetimeExpiredEvent(Generic[EndpointT, ConnectionT], Event):
-    endpoint: EndpointT = dc.field(hash=True, compare=False)
-    conn: ConnectionT = dc.field(hash=True, compare=False)
+    def _has_available_slot(self) -> bool:
+        """
+        Returns `True` if the pool has available connection slots otherwise `False`.
+        """
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, LifetimeExpiredEvent):
+        return self._size() < self.max_size
+
+    def _is_overflowed(self) -> bool:
+        """
+        Returns `True` if the pool has extra connections otherwise `False`.
+        """
+
+        return self._size() > self._max_pool_size
+
+    def _size(self) -> int:
+        return len(self._pool) + len(self._extra) + len(self._acquired) + self._reserved
+
+    def _get_size(self, acquired: Optional[bool] = None) -> int:
+        """
+        Returns the number of connections.
+
+        :param acquired: if `True` - return the number of acquired connections
+                         if `False` - return the number of free connections
+                         if `None` - return all connections number (including reserved)
+
+        return: number of connections
+        """
+
+        if acquired is None:
+            result = self._size()
+        elif acquired is True:
+            result = len(self._acquired)
+        elif acquired is False:
+            result = len(self._pool) + len(self._extra)
+        else:
+            raise AssertionError("unreachable")
+
+        return result
+
+    def _reserve(self) -> bool:
+        """
+        Reserve one slot in the pool.
+        """
+
+        if not self._has_available_slot():
             return False
 
-        return (self.__class__, self.endpoint, self.conn) == (other.__class__, other.endpoint, other.conn)
+        self._reserved += 1
 
+        return True
 
-@dc.dataclass(frozen=True)
-class PoolSizeExceededEvent(Generic[EndpointT], Event):
-    endpoint: EndpointT = dc.field(hash=True, compare=False)
+    def _unreserve(self) -> None:
+        """
+        Un-reserve a pool slot.
+        """
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, PoolSizeExceededEvent):
-            return False
+        assert self._reserved != 0
+        self._reserved -= 1
 
-        return (self.__class__, self.endpoint) == (other.__class__, other.endpoint)
+    def _acquire(self) -> Tuple[Optional[ConnectionInfo[EndpointT, ConnectionT]], bool]:
+        """
+        Acquires a connection from the pool.
+        """
 
+        if self._pool:
+            extra = False
+            conn, conn_info = self._pool.popitem(last=False)
+        elif self._extra:
+            extra = True
+            conn, conn_info = self._extra.popitem(last=True)
+        else:
+            return None, False
 
-class NotificationP(typing.Protocol):
-    def set(self) -> None: ...
-    def clear(self) -> None: ...
-    def is_set(self) -> bool: ...
-
-
-NotificationT = TypeVar('NotificationT', bound=NotificationP)
-
-
-@dc.dataclass
-class EndpointPool(Generic[NotificationT, EndpointT, ConnectionT]):
-    notification: NotificationT
-    queue: OrderedDict[ConnectionT, ConnectionInfo[EndpointT, ConnectionT]] = dc.field(default_factory=OrderedDict)
-    acquired: Dict[ConnectionT, ConnectionInfo[EndpointT, ConnectionT]] = dc.field(default_factory=dict)
-    access_queue: ExtHeap[Tuple[float, ConnectionT]] = dc.field(default_factory=ExtHeap)
-    in_progress: int = 0
-
-    def __len__(self) -> int:
-        return len(self.queue) + len(self.acquired) + self.in_progress
-
-    def acquire(self) -> ConnectionInfo[EndpointT, ConnectionT]:
-        conn, conn_info = self.queue.popitem(last=False)
-        self.acquired[conn] = conn_info
-        self.access_queue.remove((conn_info.accessed_at, conn))
+        self._acquired[conn] = conn_info
 
         conn_info.acquires += 1
         conn_info.accessed_at = time.monotonic()
 
-        self.notification.set()
+        return conn_info, extra
 
-        return conn_info
+    def _release(self, conn: ConnectionT) -> Tuple[ConnectionInfo[EndpointT, ConnectionT], bool]:
+        """
+        Releases a connection.
 
-    def release(self, conn: ConnectionT) -> ConnectionInfo[EndpointT, ConnectionT]:
-        conn_info = self.acquired.pop(conn)
+        :param conn: connection to be released
+        """
+
+        assert conn in self._acquired, "connection is not acquired"
+
+        conn_info = self._acquired.pop(conn)
         conn_info.accessed_at = time.monotonic()
 
-        self.access_queue.push((conn_info.accessed_at, conn))
-        self.queue[conn] = conn_info
+        free_pool_slots = self._max_pool_size - len(self._pool)
+        if len(self._acquired) >= free_pool_slots:
+            extra = True
+            self._extra[conn] = conn_info
+        elif len(self._pool) < self._max_pool_size:
+            extra = False
+            self._pool[conn] = conn_info
+        else:
+            raise AssertionError("unreachable")
 
-        self.notification.set()
+        return conn_info, extra
+
+    def _detach(self, conn: ConnectionT, acquired: bool = False) -> ConnectionInfo[EndpointT, ConnectionT]:
+        """
+        Detaches off a connection.
+
+        :param conn: connection to be detached
+        :param acquired: is the connection acquired
+        """
+
+        if acquired:
+            conn_info = self._acquired.pop(conn)
+        else:
+            if conn in self._pool:
+                conn_info = self._pool.pop(conn)
+            else:
+                conn_info = self._extra.pop(conn)
 
         return conn_info
 
-    def detach(self, conn: ConnectionT, acquired: bool = False) -> ConnectionInfo[EndpointT, ConnectionT]:
+    def _attach(self, conn_info: ConnectionInfo[EndpointT, ConnectionT], acquired: bool = False) -> None:
+        """
+        Attaches a connection to the pool.
+
+        :param conn_info: connection information to be attached
+        :param acquired: acquire the connection
+        """
+
+        if not self._has_available_slot():
+            raise exceptions.ConnectionPoolIsFull
+
         if acquired:
-            conn_info = self.acquired.pop(conn)
+            self._acquired[conn_info.conn] = conn_info
         else:
-            conn_info = self.queue.pop(conn)
-            self.access_queue.remove((conn_info.accessed_at, conn))
-
-        self.notification.set()
-
-        return conn_info
-
-    def attach(self, conn_info: ConnectionInfo[EndpointT, ConnectionT], acquired: bool = False) -> None:
-        if acquired:
-            self.acquired[conn_info.conn] = conn_info
-        else:
-            self.queue[conn_info.conn] = conn_info
-            self.access_queue.push((conn_info.accessed_at, conn_info.conn))
-
-        self.notification.set()
-
-    def least_recently_used(self) -> Optional[Tuple[float, ConnectionT]]:
-        return self.access_queue.top()
+            free_pool_slots = self._max_pool_size - len(self._pool)
+            if len(self._acquired) >= free_pool_slots:
+                self._extra[conn_info.conn] = conn_info
+            elif len(self._pool) < self._max_pool_size:
+                self._pool[conn_info.conn] = conn_info
+            else:
+                raise AssertionError("unreachable")
 
 
-class BaseConnectionPool(Generic[NotificationT, EndpointT, ConnectionT]):
+KeyType = TypeVar('KeyType', bound=Hashable)
+
+
+@dc.dataclass(frozen=True, order=True)
+class Event(Generic[KeyType]):
+    """
+    Connection pool event.
+
+    :param timestamp: event raise time
+    :param key: event key (must be equal for the same event)
+    """
+
+    timestamp: float = dc.field(hash=False, compare=True)
+    key: KeyType = dc.field(hash=True, compare=False)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Event):
+            return False
+
+        return self.key == other.key
+
+
+class BaseEventQueue(Generic[KeyType]):
+    """
+    Connection pool event queue.
+    """
+
+    def __init__(self) -> None:
+        self._queue: ExtHeap[Event[KeyType]] = ExtHeap()
+
+    def _insert(self, timestamp: float, key: KeyType) -> None:
+        """
+        Adds a new event to the queue.
+        """
+
+        self._queue.insert_or_replace(Event(timestamp, key))
+
+    def _remove(self, key: KeyType) -> None:
+        """
+        Remove an event from the queue.
+        """
+
+        self._queue.remove(Event(0.0, key))
+
+    def _clear(self) -> None:
+        """
+        Clears the queue.
+        """
+
+        self._queue.clear()
+
+    def _try_get_next_event(self) -> Tuple[Optional[KeyType], Optional[float]]:
+        """
+        Tries to pop the next event from the queue.
+        If the queue is empty returns `None `
+        If the first event has not occurred returns `None` and backoff timeout.
+
+        :return: event data, backoff timeout
+        """
+
+        if (event := self._queue.top()) and event.timestamp <= time.monotonic():
+            return event.key, 0.0
+
+        backoff = event.timestamp - time.monotonic() if event is not None else None
+
+        return None, backoff
+
+    def _top(self) -> Optional[KeyType]:
+        """
+        Pops an event from the queue regardless whether the event occurred or not.
+        """
+
+        if (event := self._queue.top()) is None:
+            return None
+
+        return event.key
+
+
+class EventType(IntEnum):
+    LIFETIME = 1
+    IDLETIME = 2
+
+
+class BaseConnectionPool(Generic[EndpointT, ConnectionT]):
     """
     Asynchronous connection pool.
 
-    :param idle_timeout: number of seconds after which a connection will be closed respecting min_idle parameter
-                         (the connection will be closed only if the connection number exceeds min_idle)
-    :param max_lifetime: number of seconds after which a connection will be closed (min_idle parameter will be ignored)
-    :param min_idle: minimum number of connections the pool tries to hold (for each endpoint)
-    :param max_size: maximum number of connections (for each endpoint)
-    :param total_max_size: maximum number of connections (for all endpoints)
+    :param idle_timeout: inactivity time (in seconds) after which an extra connection will be disposed
+                         (a connection considered as extra if the number of endpoint connection exceeds ``min_idle``).
+    :param max_lifetime: number of seconds after which any connection will be disposed.
+    :param min_idle: minimum number of connections the pool tries to hold for each endpoint. Connections that exceed
+                     that number will be considered as extra and will be disposed after ``idle_timeout`` of inactivity.
+    :param max_size: maximum number of endpoint connections.
+    :param total_max_size: maximum number of all connections in the pool.
     """
 
     def __init__(
             self,
-            pool_factory: Callable[[], EndpointPool[NotificationT, EndpointT, ConnectionT]],
             *,
             idle_timeout: float = 60.0,
             max_lifetime: float = 3600.0,
@@ -214,25 +367,9 @@ class BaseConnectionPool(Generic[NotificationT, EndpointT, ConnectionT]):
         self._total_max_size = total_max_size
 
         self._pool_size = 0
-        self._pools: Dict[EndpointT, EndpointPool[NotificationT, EndpointT, ConnectionT]] = defaultdict(pool_factory)
-        self._event_queue: ExtHeap[Event] = ExtHeap()
 
-    def __len__(self) -> int:
+    def get_size(self) -> int:
         return self._pool_size
-
-    def get_endpoint_pool_size(self, endpoint: EndpointT, acquired: Optional[bool] = None) -> int:
-        result = 0
-        if (pool := self._pools.get(endpoint)) is not None:
-            if acquired is None:
-                result = len(pool)
-            elif acquired is True:
-                result = len(pool.acquired)
-            elif acquired is False:
-                result = len(pool.queue)
-            else:
-                raise AssertionError("unreachable")
-
-        return result
 
     @property
     def idle_timeout(self) -> float:
@@ -254,137 +391,6 @@ class BaseConnectionPool(Generic[NotificationT, EndpointT, ConnectionT]):
     def total_max_size(self) -> int:
         return self._total_max_size
 
-    def _has_available_slot(self, endpoint: EndpointT) -> bool:
-        if self._pool_size >= self._total_max_size:
-            return False
-
-        pool = self._pools[endpoint]
-        if len(pool) >= self._max_size:
-            return False
-
-        return True
-
-    def _try_acquire(self, endpoint: EndpointT) -> Optional[ConnectionT]:
-        pool = self._pools[endpoint]
-
-        if len(pool.queue) != 0:
-            conn_info = pool.acquire()
-            self._event_queue.remove(
-                LifetimeExpiredEvent(
-                    timestamp=conn_info.created_at + self._max_lifetime,
-                    endpoint=endpoint,
-                    conn=conn_info.conn,
-                ),
-            )
-            return conn_info.conn
-
-        else:
-            return None
-
-    def _release(self, conn: ConnectionT, endpoint: EndpointT) -> None:
-        if (pool := self._pools.get(endpoint)) is None:
-            raise RuntimeError("endpoint mismatched")
-
-        try:
-            conn_info = pool.release(conn)
-        except KeyError:
-            raise RuntimeError("connection not acquired")
-
-        self._event_queue.push(
-            LifetimeExpiredEvent(
-                timestamp=conn_info.created_at + self._max_lifetime,
-                endpoint=endpoint,
-                conn=conn,
-            ),
-        )
-
-        if len(pool) > self._min_idle:
-            event = PoolSizeExceededEvent(
-                timestamp=time.monotonic(),
-                endpoint=endpoint,
-            )
-            if event not in self._event_queue:
-                self._event_queue.push(event)
-
-    def _get_disposable_connection(self) -> Tuple[float, Optional[ConnectionInfo[EndpointT, ConnectionT]]]:
-        conn_info: Optional[ConnectionInfo[EndpointT, ConnectionT]] = None
-        backoff: float = 60.0  # why not
-
-        if (event := self._event_queue.top()) is not None:
-            now = time.monotonic()
-            if now >= event.timestamp:
-                self._event_queue.pop()  # remove top event
-                conn_info = self._handle_event(event)
-                backoff = 0.0
-            else:
-                conn_info = None
-                backoff = event.timestamp - now
-
-        return backoff, conn_info
-
-    def _handle_event(self, event: Event) -> Optional[ConnectionInfo[EndpointT, ConnectionT]]:
-        if isinstance(event, LifetimeExpiredEvent):
-            return self._on_lifetime_expired_event(event)
-        elif isinstance(event, PoolSizeExceededEvent):
-            return self._on_pool_size_exceeded_event(event)
-        else:
-            raise AssertionError('unreachable')
-
-    def _on_lifetime_expired_event(
-            self,
-            event: LifetimeExpiredEvent[EndpointT, ConnectionT],
-    ) -> ConnectionInfo[EndpointT, ConnectionT]:
-        pool = self._pools[event.endpoint]
-
-        conn_info = pool.detach(event.conn)
-        if len(pool) == 0:
-            self._pools.pop(event.endpoint)
-
-        self._pool_size -= 1
-
-        return conn_info
-
-    def _on_pool_size_exceeded_event(
-            self,
-            event: PoolSizeExceededEvent[EndpointT],
-    ) -> Optional[ConnectionInfo[EndpointT, ConnectionT]]:
-        pool = self._pools[event.endpoint]
-
-        if len(pool) > self._min_idle:
-            if (access := pool.least_recently_used()) is not None:
-                accessed_at, conn = access
-
-                now = time.monotonic()
-                if now >= accessed_at + self._idle_timeout:
-                    conn_info = pool.detach(conn)
-                    self._pool_size -= 1
-
-                    self._event_queue.remove(
-                        LifetimeExpiredEvent(
-                            timestamp=conn_info.created_at + self._max_lifetime,
-                            endpoint=event.endpoint,
-                            conn=conn,
-                        ),
-                    )
-                    if len(pool) > self._min_idle:  # pool size still exceeds max value
-                        event = PoolSizeExceededEvent(
-                            timestamp=time.monotonic(),
-                            endpoint=event.endpoint,
-                        )
-                        if event not in self._event_queue:
-                            self._event_queue.push(event)
-
-                    return conn_info
-
-                else:
-                    event = PoolSizeExceededEvent(
-                        timestamp=accessed_at + self._idle_timeout,
-                        endpoint=event.endpoint,
-                    )
-                    if event not in self._event_queue:
-                        self._event_queue.push(event)
-
-        if len(pool) == 0:
-            self._pools.pop(event.endpoint)
-
-        return None
+    @property
+    def is_full(self) -> bool:
+        return self._pool_size >= self._total_max_size
