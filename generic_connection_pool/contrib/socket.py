@@ -1,10 +1,14 @@
+"""
+Synchronous socket connection manager implementation.
+"""
+
 import contextlib
 import socket
 from ipaddress import IPv4Address, IPv6Address
 from ssl import SSLContext, SSLSocket
 from typing import Generator, Optional, Tuple, Union
 
-from generic_connection_pool.threding import BaseConnectionManager
+from generic_connection_pool.threading import BaseConnectionManager
 
 IpAddress = Union[IPv4Address, IPv6Address]
 Hostname = str

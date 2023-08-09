@@ -54,7 +54,10 @@ async def tcp_server(port_gen: Generator[int, None, None]) -> AsyncGenerator[Tup
 
 
 @pytest.fixture
-async def ssl_server(resource_dir: Path, port_gen: Generator[int, None, None]) -> AsyncGenerator[Tuple[str, int], None]:
+async def ssl_server(
+        resource_dir: Path,
+        port_gen: Generator[int, None, None],
+) -> AsyncGenerator[Tuple[str, int], None]:
     hostname, port = 'localhost', next(port_gen)
     ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     ssl_ctx.load_cert_chain(resource_dir / 'ssl.cert', resource_dir / 'ssl.key')

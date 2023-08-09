@@ -9,7 +9,7 @@ from typing import Generator, Optional, Tuple
 import pytest
 
 from generic_connection_pool.contrib.socket import SslSocketConnectionManager, TcpSocketConnectionManager
-from generic_connection_pool.threding import ConnectionPool
+from generic_connection_pool.threading import ConnectionPool
 
 
 class EchoTCPServer(socketserver.TCPServer):
@@ -104,9 +104,10 @@ def test_tcp_socket_manager_timeout(delay, port_gen: Generator[int, None, None])
 
     pool = ConnectionPool(TcpSocketConnectionManager())
     with pytest.raises(TimeoutError):
-        pool.acquire(endpoint=(addr, port), timeout=delay)
-        pool.acquire(endpoint=(addr, port), timeout=delay)
-        pool.acquire(endpoint=(addr, port), timeout=delay)
+        with pool.connection(endpoint=(addr, port), timeout=delay):
+            with pool.connection(endpoint=(addr, port), timeout=delay):
+                with pool.connection(endpoint=(addr, port), timeout=delay):
+                    pass
 
     pool.close()
     server_sock.close()
@@ -121,9 +122,10 @@ def test_ssl_socket_manager_timeout(delay, port_gen: Generator[int, None, None])
 
     pool = ConnectionPool(SslSocketConnectionManager(ssl.create_default_context()))
     with pytest.raises(TimeoutError):
-        pool.acquire(endpoint=(hostname, port), timeout=delay)
-        pool.acquire(endpoint=(hostname, port), timeout=delay)
-        pool.acquire(endpoint=(hostname, port), timeout=delay)
+        with pool.connection(endpoint=(hostname, port), timeout=delay):
+            with pool.connection(endpoint=(hostname, port), timeout=delay):
+                with pool.connection(endpoint=(hostname, port), timeout=delay):
+                    pass
 
     pool.close()
     server_sock.close()
