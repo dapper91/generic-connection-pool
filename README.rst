@@ -17,11 +17,15 @@ generic-connection-pool
 .. image:: https://codecov.io/gh/dapper91/generic-connection-pool/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/dapper91/generic-connection-pool
     :alt: Code coverage
+.. image:: https://readthedocs.org/projects/generic-connection-pool/badge/?version=stable&style=flat
+   :alt: ReadTheDocs status
+   :target: https://generic-connection-pool.readthedocs.io/en/stable/
 
 
 ``generic-connection-pool`` is a connection pool that can be used for TCP, http, database connections.
 
-Features:
+Features
+--------
 
 - **generic nature**: can be used for any connection you desire (TCP, http, database)
 - **runtime agnostic**: synchronous and asynchronous pool supported
@@ -29,206 +33,80 @@ Features:
 - **fully-typed**: mypy type-checker compatible
 
 
-Installation
-------------
+Getting started
+---------------
 
-You can install generic-connection-pool with pip:
+Connection pool supports the following configurations:
 
-.. code-block:: console
+* **background_collector**: if ``True`` starts a background worker that disposes expired and idle connections
+  maintaining requested pool state. If ``False`` the connections will be disposed on each connection release.
+* **dispose_batch_size**: maximum number of expired and idle connections to be disposed on connection release
+  (if background collector is started the parameter is ignored).
+* **idle_timeout**: inactivity time (in seconds) after which an extra connection will be disposed
+  (a connection considered as extra if the number of endpoint connection exceeds ``min_idle``).
+* **max_lifetime**: number of seconds after which any connection will be disposed.
+* **min_idle**: minimum number of connections in each endpoint the pool tries to hold. Connections that exceed
+  that number will be considered as extra and disposed after ``idle_timeout`` seconds of inactivity.
+* **max_size**: maximum number of endpoint connections.
+* **total_max_size**: maximum number of all connections in the pool.
 
-    $ pip install generic-connection-pool
-
-
-Quickstart
-----------
-
-The following example illustrates how to create asynchronous ssl socket pool:
-
-.. code-block:: python
-
-    import asyncio
-    from typing import Tuple
-
-    from generic_connection_pool.asyncio import ConnectionPool
-    from generic_connection_pool.contrib.socket_async import TcpStreamConnectionManager
-
-    Hostname = str
-    Port = int
-    Endpoint = Tuple[Hostname, Port]
-    Connection = Tuple[asyncio.StreamReader, asyncio.StreamWriter]
-
-
-    async def main() -> None:
-        pool = ConnectionPool[Endpoint, Connection](
-            TcpStreamConnectionManager(ssl=True),
-            idle_timeout=30.0,
-            max_lifetime=600.0,
-            min_idle=3,
-            max_size=20,
-            total_max_size=100,
-            background_collector=True,
-        )
-
-        async with pool.connection(endpoint=('www.wikipedia.org', 443), timeout=5.0) as (reader, writer):
-            request = (
-                'GET / HTTP/1.0\n'
-                'Host: www.wikipedia.org\n'
-                '\n'
-                '\n'
-            )
-            writer.write(request.encode())
-            await writer.drain()
-            response = await reader.read()
-
-            print(response.decode())
-
-    asyncio.run(main())
-
-
-Configuration
--------------
-
-Synchronous and asynchronous pools supports the following parameters:
-
-* **connection_manager**: connection manager instance
-* **acquire_timeout**: connection acquiring default timeout
-* **dispose_batch_size**: number of connections to be disposed at once
-  (if background collector is started the parameter is ignored)
-* **dispose_timeout**: connection disposal timeout
-* **background_collector**: start worker that disposes timed-out connections in background maintain provided pool state
-  otherwise they will be disposed on each connection release
-* **idle_timeout**: number of seconds after which a connection will be closed respecting min_idle parameter
-  (the connection will be closed only if the connection number exceeds min_idle)
-* **max_lifetime**: number of seconds after which a connection will be closed (min_idle parameter will be ignored)
-* **min_idle**: minimum number of connections the pool tries to hold (for each endpoint)
-* **max_size**: maximum number of connections (for each endpoint)
-* **total_max_size**: maximum number of connections (for all endpoints)
-
-
-Generic nature
---------------
-
-Since the pool has generic nature is can be used for database connections as well:
-
-.. code-block:: python
-
-    import psycopg2.extensions
-
-    from generic_connection_pool.contrib.psycopg2 import DbConnectionManager
-    from generic_connection_pool.threading import ConnectionPool
-
-    Endpoint = str
-    Connection = psycopg2.extensions.connection
-
-
-    def main() -> None:
-        dsn_params = dict(dbname='postgres', user='postgres', password='secret')
-
-        pool = ConnectionPool[Endpoint, Connection](
-            DbConnectionManager(
-                dsn_params={
-                    'master': dict(dsn_params, host='db-master.local'),
-                    'replica-1': dict(dsn_params, host='db-replica-1.local'),
-                    'replica-2': dict(dsn_params, host='db-replica-2.local'),
-                },
-            ),
-            acquire_timeout=2.0,
-            idle_timeout=60.0,
-            max_lifetime=600.0,
-            min_idle=3,
-            max_size=10,
-            total_max_size=15,
-            background_collector=True,
-        )
-
-        with pool.connection(endpoint='master') as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM pg_stats;")
-            print(cur.fetchone())
-
-        with pool.connection(endpoint='replica-1') as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM pg_stats;")
-            print(cur.fetchone())
-
-        pool.close()
-
-
-    main()
-
-
-Extendability
--------------
-
-If built-in connection managers are not suitable for your task the one can be easily created by yourself:
+The following example illustrates how to create https pool:
 
 .. code-block:: python
 
     import socket
-    from ssl import SSLContext, SSLSocket
-    from typing import Optional, Tuple
+    import ssl
+    import urllib.parse
+    from http.client import HTTPResponse
+    from typing import Tuple
 
-    from generic_connection_pool.threading import BaseConnectionManager, ConnectionPool
+    from generic_connection_pool.contrib.socket import SslSocketConnectionManager
+    from generic_connection_pool.threading import ConnectionPool
 
     Hostname = str
     Port = int
-    SslEndpoint = Tuple[Hostname, Port]
-    Connection = SSLSocket
+    Endpoint = Tuple[Hostname, Port]
+    Connection = socket.socket
 
 
-    class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, Connection]):
-        """
-        SSL socket connection manager.
-        """
-
-        def __init__(self, ssl: SSLContext):
-            self._ssl = ssl
-
-        def create(self, endpoint: SslEndpoint, timeout: Optional[float] = None) -> Connection:
-            hostname, port = endpoint
-
-            sock = self._ssl.wrap_socket(socket.socket(type=socket.SOCK_STREAM), server_hostname=hostname)
-            sock.settimeout(timeout)
-            sock.connect((hostname, port))
-
-            return sock
-
-        def dispose(self, endpoint: SslEndpoint, conn: Connection, timeout: Optional[float] = None) -> None:
-            conn.settimeout(timeout)
-            try:
-                conn.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-
-            conn.close()
+    http_pool = ConnectionPool[Endpoint, Connection](
+        SslSocketConnectionManager(ssl.create_default_context()),
+        idle_timeout=30.0,
+        max_lifetime=600.0,
+        min_idle=3,
+        max_size=20,
+        total_max_size=100,
+        background_collector=True,
+    )
 
 
-    def main() -> None:
-        pool = ConnectionPool[SslEndpoint, Connection](
-            SslSocketConnectionManager(ssl=SSLContext()),
-            idle_timeout=30.0,
-            max_lifetime=600.0,
-            min_idle=3,
-            max_size=20,
-            total_max_size=100,
-            background_collector=True,
-        )
+    def fetch(url: str, timeout: float = 5.0) -> None:
+        url = urllib.parse.urlsplit(url)
+        port = url.port or 443 if url.scheme == 'https' else 80
 
-        with pool.connection(endpoint=('www.wikipedia.org', 443), timeout=5.0) as sock:
+        with http_pool.connection(endpoint=(url.hostname, port), timeout=timeout) as sock:
             request = (
-                'GET / HTTP/1.0\n'
-                'Host: www.wikipedia.org\n'
-                '\n'
-                '\n'
-            )
+                'GET {path} HTTP/1.1\r\n'
+                'Host: {host}\r\n'
+                '\r\n'
+                '\r\n'
+            ).format(host=url.hostname, path=url.path)
+
             sock.write(request.encode())
-            response = []
-            while chunk := sock.recv():
-                response.append(chunk)
 
-            print(b''.join(response).decode())
+            response = HTTPResponse(sock)
+            response.begin()
+            status, body = response.getcode(), response.read(response.length)
 
-        pool.close()
+            print(status)
+            print(body)
 
 
-    main()
+    try:
+        fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection is opened
+        fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection is reused
+    finally:
+        http_pool.close()
+
+
+See `documentation <https://generic-connection-pool.readthedocs.io/en/latest/>`_ for more details.
