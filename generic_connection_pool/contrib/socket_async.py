@@ -1,3 +1,7 @@
+"""
+Asynchronous socket connection manager implementation.
+"""
+
 import asyncio
 import socket
 from ipaddress import IPv4Address, IPv6Address
@@ -75,4 +79,10 @@ class TcpStreamConnectionManager(BaseConnectionManager[TcpStreamEndpoint, TcpStr
 
     async def check_aliveness(self, endpoint: TcpStreamEndpoint, conn: TcpStream) -> bool:
         reader, writer = conn
-        return not reader.at_eof()
+
+        try:
+            await reader.read(0)
+        except OSError:
+            return False
+
+        return not writer.is_closing() and not reader.at_eof()

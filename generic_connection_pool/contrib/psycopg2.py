@@ -1,8 +1,12 @@
-from typing import List, Mapping, Optional
+"""
+Postgres connection manager implementation.
+"""
+
+from typing import Mapping, Optional
 
 import psycopg2.extensions
 
-from generic_connection_pool.threding import BaseConnectionManager
+from generic_connection_pool.threading import BaseConnectionManager
 
 DbEndpoint = str
 Connection = psycopg2.extensions.connection
@@ -28,14 +32,8 @@ class DbConnectionManager(BaseConnectionManager[DbEndpoint, Connection]):
     def check_aliveness(self, endpoint: DbEndpoint, conn: Connection, timeout: Optional[float] = None) -> bool:
         try:
             with conn.cursor() as cur:
-                query: List[str] = []
-                if timeout is not None:
-                    query.append(f"SET statement_timeout = '{int(timeout)}s';")
-
-                query.append("SELECT 1;")
-                cur.execute(''.join(query))
+                cur.execute("SELECT 1;")
                 cur.fetchone()
-
         except (psycopg2.Error, OSError):
             return False
 
