@@ -10,7 +10,7 @@ from generic_connection_pool import exceptions
 from generic_connection_pool.asyncio import BaseConnectionManager, ConnectionPool
 
 
-class TestConnection:
+class MockConnection:
     def __init__(self, name: str):
         self._name = name
 
@@ -21,14 +21,14 @@ class TestConnection:
         return f"{self.__class__.__name__}({str(self)})"
 
 
-class TestConnectionManager(BaseConnectionManager[int, TestConnection]):
+class MockConnectionManager(BaseConnectionManager[int, MockConnection]):
     def __init__(self):
-        self.creations: List[Tuple[int, TestConnection]] = []
-        self.disposals: List[TestConnection] = []
-        self.acquires: List[TestConnection] = []
-        self.releases: List[TestConnection] = []
-        self.dead: List[TestConnection] = []
-        self.aliveness: Dict[TestConnection, bool] = {}
+        self.creations: List[Tuple[int, MockConnection]] = []
+        self.disposals: List[MockConnection] = []
+        self.acquires: List[MockConnection] = []
+        self.releases: List[MockConnection] = []
+        self.dead: List[MockConnection] = []
+        self.aliveness: Dict[MockConnection, bool] = {}
 
         self.create_err: Optional[Exception] = None
         self.dispose_err: Optional[Exception] = None
@@ -39,41 +39,41 @@ class TestConnectionManager(BaseConnectionManager[int, TestConnection]):
 
         self._conn_cnt = 1
 
-    async def create(self, endpoint: int) -> TestConnection:
+    async def create(self, endpoint: int) -> MockConnection:
         if err := self.create_err:
             raise err
 
-        conn = TestConnection(f"{endpoint}:{self._conn_cnt}")
+        conn = MockConnection(f"{endpoint}:{self._conn_cnt}")
         self._conn_cnt += 1
         self.creations.append((endpoint, conn))
 
         return conn
 
-    async def dispose(self, endpoint: int, conn: TestConnection) -> None:
+    async def dispose(self, endpoint: int, conn: MockConnection) -> None:
         if err := self.dispose_err:
             raise err
 
         self.disposals.append(conn)
 
-    async def check_aliveness(self, endpoint: int, conn: TestConnection) -> bool:
+    async def check_aliveness(self, endpoint: int, conn: MockConnection) -> bool:
         if err := self.check_aliveness_err:
             raise err
 
         return self.aliveness.get(conn, True)
 
-    async def on_acquire(self, endpoint: int, conn: TestConnection) -> None:
+    async def on_acquire(self, endpoint: int, conn: MockConnection) -> None:
         if err := self.on_acquire_err:
             raise err
 
         self.acquires.append(conn)
 
-    async def on_release(self, endpoint: int, conn: TestConnection) -> None:
+    async def on_release(self, endpoint: int, conn: MockConnection) -> None:
         if err := self.on_release_err:
             raise err
 
         self.releases.append(conn)
 
-    async def on_connection_dead(self, endpoint: int, conn: TestConnection) -> None:
+    async def on_connection_dead(self, endpoint: int, conn: MockConnection) -> None:
         if err := self.on_connection_dead_err:
             raise err
 
@@ -81,19 +81,19 @@ class TestConnectionManager(BaseConnectionManager[int, TestConnection]):
 
 
 @pytest.fixture
-def connection_manager() -> TestConnectionManager:
-    return TestConnectionManager()
+def connection_manager() -> MockConnectionManager:
+    return MockConnectionManager()
 
 
 @pytest.mark.timeout(5.0)
-async def test_params(connection_manager: TestConnectionManager):
+async def test_params(connection_manager: MockConnectionManager):
     idle_timeout = 10.0
     max_lifetime = 60.0
     min_idle = 2
     max_size = 16
     total_max_size = 512
 
-    pool = ConnectionPool[int, TestConnection](
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=idle_timeout,
         max_lifetime=max_lifetime,
@@ -113,8 +113,8 @@ async def test_params(connection_manager: TestConnectionManager):
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_context_manager(connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](connection_manager, min_idle=0, idle_timeout=0.0)
+async def test_pool_context_manager(connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](connection_manager, min_idle=0, idle_timeout=0.0)
 
     async with pool.connection(endpoint=1) as conn1:
         assert pool.get_size() == 1
@@ -133,15 +133,15 @@ async def test_pool_context_manager(connection_manager: TestConnectionManager):
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_acquire_round_robin(connection_manager: TestConnectionManager):
-    async def fill_endpoint_pool(pool: ConnectionPool, endpoint: int, size: int) -> List[TestConnection]:
+async def test_pool_acquire_round_robin(connection_manager: MockConnectionManager):
+    async def fill_endpoint_pool(pool: ConnectionPool, endpoint: int, size: int) -> List[MockConnection]:
         connections = [await pool.acquire(endpoint) for _ in range(size)]
         for conn in connections:
             await pool.release(conn, endpoint)
 
         return connections
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, min_idle=3)
+    pool = ConnectionPool[int, MockConnection](connection_manager, min_idle=3)
     connections = {
         1: await fill_endpoint_pool(pool, endpoint=1, size=1),
         2: await fill_endpoint_pool(pool, endpoint=2, size=2),
@@ -158,8 +158,8 @@ async def test_pool_acquire_round_robin(connection_manager: TestConnectionManage
 
 
 @pytest.mark.timeout(5.0)
-async def test_connection_manager_callbacks(connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](connection_manager)
+async def test_connection_manager_callbacks(connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](connection_manager)
     async with pool.connection(endpoint=1) as conn:
         pass
 
@@ -171,8 +171,8 @@ async def test_connection_manager_callbacks(connection_manager: TestConnectionMa
 
 
 @pytest.mark.timeout(5.0)
-async def test_connection_wait(delay: float, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](
+async def test_connection_wait(delay: float, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         max_size=1,
     )
@@ -196,8 +196,8 @@ async def test_connection_wait(delay: float, connection_manager: TestConnectionM
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_max_size(delay, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](
+async def test_pool_max_size(delay, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=0,
         idle_timeout=0.0,
@@ -221,8 +221,8 @@ async def test_pool_max_size(delay, connection_manager: TestConnectionManager):
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_total_max_size(delay, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](
+async def test_pool_total_max_size(delay, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=0,
         idle_timeout=0.0,
@@ -249,10 +249,10 @@ async def test_pool_total_max_size(delay, connection_manager: TestConnectionMana
 @pytest.mark.timeout(5.0)
 async def test_pool_disposable_connections_collection(
         delay: float,
-        connection_manager: TestConnectionManager,
+        connection_manager: MockConnectionManager,
         background_collector: bool,
 ):
-    pool = ConnectionPool[int, TestConnection](
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=0.0,
         min_idle=0,
@@ -283,10 +283,10 @@ async def test_pool_disposable_connections_collection(
 @pytest.mark.timeout(5.0)
 async def test_pool_min_idle(
         delay: float,
-        connection_manager: TestConnectionManager,
+        connection_manager: MockConnectionManager,
         background_collector: bool,
 ):
-    pool = ConnectionPool[int, TestConnection](
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=0.0,
         min_idle=1,
@@ -329,10 +329,10 @@ async def test_pool_min_idle(
 @pytest.mark.timeout(5.0)
 async def test_pool_idle_timeout(
         delay: float,
-        connection_manager: TestConnectionManager,
+        connection_manager: MockConnectionManager,
         background_collector: bool,
 ):
-    pool = ConnectionPool[int, TestConnection](
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=delay,
         min_idle=1,
@@ -361,8 +361,8 @@ async def test_pool_idle_timeout(
 
 
 @pytest.mark.timeout(5.0)
-async def test_idle_connection_close_on_total_max_size_exceeded(connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](
+async def test_idle_connection_close_on_total_max_size_exceeded(connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=3,
         max_size=3,
@@ -391,10 +391,10 @@ async def test_idle_connection_close_on_total_max_size_exceeded(connection_manag
 @pytest.mark.timeout(5.0)
 async def test_pool_max_lifetime(
         delay: float,
-        connection_manager: TestConnectionManager,
+        connection_manager: MockConnectionManager,
         background_collector: bool,
 ):
-    pool = ConnectionPool[int, TestConnection](
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=delay,
         max_lifetime=2 * delay,
@@ -424,8 +424,8 @@ async def test_pool_max_lifetime(
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_aliveness_check(delay: float, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](connection_manager)
+async def test_pool_aliveness_check(delay: float, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](connection_manager)
 
     async with pool.connection(endpoint=1) as conn1:
         pass
@@ -443,8 +443,8 @@ async def test_pool_aliveness_check(delay: float, connection_manager: TestConnec
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_close(delay: float, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](
+async def test_pool_close(delay: float, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=10,
         max_lifetime=10,
@@ -466,8 +466,8 @@ async def test_pool_close(delay: float, connection_manager: TestConnectionManage
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_close_wait(delay: float, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](
+async def test_pool_close_wait(delay: float, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](
         connection_manager,
         idle_timeout=10,
         max_lifetime=10,
@@ -515,8 +515,8 @@ async def test_pool_close_wait(delay: float, connection_manager: TestConnectionM
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_close_timeout(delay: float, connection_manager: TestConnectionManager):
-    pool = ConnectionPool[int, TestConnection](connection_manager)
+async def test_pool_close_timeout(delay: float, connection_manager: MockConnectionManager):
+    pool = ConnectionPool[int, MockConnection](connection_manager)
 
     acquired = asyncio.Event()
 
@@ -536,12 +536,12 @@ async def test_pool_close_timeout(delay: float, connection_manager: TestConnecti
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_connection_manager_creation_error(connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_creation_error(connection_manager: MockConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.create_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager)
+    pool = ConnectionPool[int, MockConnection](connection_manager)
     with pytest.raises(TestException):
         async with pool.connection(endpoint=1):
             pass
@@ -551,12 +551,12 @@ async def test_pool_connection_manager_creation_error(connection_manager: TestCo
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_connection_manager_release_error(connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_release_error(connection_manager: MockConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_release_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=0.0, min_idle=0)
+    pool = ConnectionPool[int, MockConnection](connection_manager, idle_timeout=0.0, min_idle=0)
     with pytest.raises(TestException):
         async with pool.connection(endpoint=1):
             pass
@@ -565,12 +565,12 @@ async def test_pool_connection_manager_release_error(connection_manager: TestCon
     assert await pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
-async def test_pool_connection_manager_aliveness_error(delay: float, connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_aliveness_error(delay: float, connection_manager: MockConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.check_aliveness_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
+    pool = ConnectionPool[int, MockConnection](connection_manager, idle_timeout=delay, min_idle=1)
     async with pool.connection(endpoint=1):
         pass
 
@@ -583,12 +583,12 @@ async def test_pool_connection_manager_aliveness_error(delay: float, connection_
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_connection_manager_dead_connection_error(delay: float, connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_dead_connection_error(delay: float, connection_manager: MockConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_connection_dead_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
+    pool = ConnectionPool[int, MockConnection](connection_manager, idle_timeout=delay, min_idle=1)
     async with pool.connection(endpoint=1) as conn:
         pass
 
@@ -602,12 +602,12 @@ async def test_pool_connection_manager_dead_connection_error(delay: float, conne
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_connection_manager_acquire_error(delay: float, connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_acquire_error(delay: float, connection_manager: MockConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.on_acquire_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=delay, min_idle=1)
+    pool = ConnectionPool[int, MockConnection](connection_manager, idle_timeout=delay, min_idle=1)
     with pytest.raises(TestException):
         async with pool.connection(endpoint=1):
             pass
@@ -617,12 +617,12 @@ async def test_pool_connection_manager_acquire_error(delay: float, connection_ma
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_connection_manager_dispose_error(connection_manager: TestConnectionManager):
+async def test_pool_connection_manager_dispose_error(connection_manager: MockConnectionManager):
     class TestException(Exception):
         pass
     connection_manager.dispose_err = TestException()
 
-    pool = ConnectionPool[int, TestConnection](connection_manager, idle_timeout=0.0, min_idle=0)
+    pool = ConnectionPool[int, MockConnection](connection_manager, idle_timeout=0.0, min_idle=0)
     async with pool.connection(endpoint=1):
         pass
 
