@@ -3,6 +3,7 @@ Asynchronous socket connection manager implementation.
 """
 
 import asyncio
+import errno
 import socket
 from ipaddress import IPv4Address, IPv6Address
 from ssl import SSLContext
@@ -41,6 +42,18 @@ class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socke
     async def dispose(self, endpoint: TcpEndpoint, conn: socket.socket) -> None:
         conn.shutdown(socket.SHUT_RDWR)
         conn.close()
+
+    async def check_aliveness(self, endpoint: TcpEndpoint, conn: socket.socket) -> bool:
+        try:
+            if conn.recv(1, socket.MSG_PEEK) == b'':
+                return False
+        except BlockingIOError as exc:
+            if exc.errno != errno.EAGAIN:
+                raise
+        except OSError:
+            return False
+
+        return True
 
 
 Hostname = str
