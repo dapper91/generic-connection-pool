@@ -73,11 +73,18 @@ async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     addr, port = tcp_server
 
     pool = ConnectionPool(TcpSocketConnectionManager())
-    async with pool.connection((addr, port)) as sock:
-        request = b'test'
-        await loop.sock_sendall(sock, request)
-        response = await loop.sock_recv(sock, len(request))
-        assert response == request
+
+    request = b'test'
+    for _ in range(3):
+        async with pool.connection((addr, port)) as sock1:
+            await loop.sock_sendall(sock1, request)
+            response = await loop.sock_recv(sock1, len(request))
+            assert response == request
+
+            async with pool.connection((addr, port)) as sock2:
+                await loop.sock_sendall(sock2, request)
+                response = await loop.sock_recv(sock2, len(request))
+                assert response == request
 
     await pool.close()
 
@@ -86,12 +93,20 @@ async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Addr
     addr, port = tcp_server
 
     pool = ConnectionPool(TcpStreamConnectionManager(ssl=None))
-    async with pool.connection((str(addr), port)) as (reader, writer):
-        request = b'test'
-        writer.write(request)
-        await writer.drain()
-        response = await reader.read()
-        assert response == request
+
+    request = b'test'
+    for _ in range(3):
+        async with pool.connection((str(addr), port)) as (reader1, writer1):
+            writer1.write(request)
+            await writer1.drain()
+            response = await reader1.read()
+            assert response == request
+
+            async with pool.connection((str(addr), port)) as (reader2, writer2):
+                writer2.write(request)
+                await writer2.drain()
+                response = await reader2.read()
+                assert response == request
 
     await pool.close()
 
@@ -101,11 +116,19 @@ async def test_ssl_stream_manager(resource_dir: Path, ssl_server: Tuple[str, int
     ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
 
     pool = ConnectionPool(TcpStreamConnectionManager(ssl_context))
-    async with pool.connection((hostname, port)) as (reader, writer):
-        request = b'test'
-        writer.write(request)
-        await writer.drain()
-        response = await reader.read()
-        assert response == request
+
+    request = b'test'
+    for _ in range(3):
+        async with pool.connection((hostname, port)) as (reader1, writer1):
+            writer1.write(request)
+            await writer1.drain()
+            response = await reader1.read()
+            assert response == request
+
+            async with pool.connection((hostname, port)) as (reader2, writer2):
+                writer2.write(request)
+                await writer2.drain()
+                response = await reader2.read()
+                assert response == request
 
     await pool.close()

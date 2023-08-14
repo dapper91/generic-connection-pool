@@ -12,7 +12,7 @@ from generic_connection_pool.contrib.socket import SslSocketConnectionManager, T
 from generic_connection_pool.threading import ConnectionPool
 
 
-class EchoTCPServer(socketserver.TCPServer):
+class EchoTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
     class EchoRequestHandler(socketserver.BaseRequestHandler):
@@ -72,11 +72,18 @@ def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     addr, port = tcp_server
 
     pool = ConnectionPool(TcpSocketConnectionManager())
-    with pool.connection((addr, port)) as sock:
-        request = b'test'
-        sock.sendall(request)
-        response = sock.recv(len(request))
-        assert response == request
+
+    request = b'test'
+    for _ in range(3):
+        with pool.connection((addr, port)) as sock1:
+            sock1.sendall(request)
+            response = sock1.recv(len(request))
+            assert response == request
+
+            with pool.connection((addr, port)) as sock2:
+                sock2.sendall(request)
+                response = sock2.recv(len(request))
+                assert response == request
 
     pool.close()
 
@@ -86,11 +93,18 @@ def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
     ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
 
     pool = ConnectionPool(SslSocketConnectionManager(ssl_context))
-    with pool.connection((hostname, port)) as sock:
-        request = b'test'
-        sock.sendall(request)
-        response = sock.recv(len(request))
-        assert response == request
+
+    request = b'test'
+    for _ in range(3):
+        with pool.connection((hostname, port)) as sock1:
+            sock1.sendall(request)
+            response = sock1.recv(len(request))
+            assert response == request
+
+            with pool.connection((hostname, port)) as sock2:
+                sock2.sendall(request)
+                response = sock2.recv(len(request))
+                assert response == request
 
     pool.close()
 
