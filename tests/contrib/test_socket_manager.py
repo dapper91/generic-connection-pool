@@ -37,14 +37,13 @@ class EchoTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 
 class EchoSSLServer(EchoTCPServer):
-    def __init__(self, server_address: Tuple[str, int], keyfile: Path, certfile: Path):
+    def __init__(self, server_address: Tuple[str, int], ssl_ctx: ssl.SSLContext):
         super().__init__(server_address)
-        self._keyfile = keyfile
-        self._certfile = certfile
+        self._ssl_ctx = ssl_ctx
 
     def get_request(self):
         sock, addr = super().get_request()
-        ssl_socket = ssl.wrap_socket(sock, server_side=True, keyfile=self._keyfile, certfile=self._certfile)
+        ssl_socket = self._ssl_ctx.wrap_socket(sock, server_side=True)
         return ssl_socket, addr
 
 
@@ -62,7 +61,10 @@ def tcp_server(port_gen: Generator[int, None, None]) -> Generator[Tuple[IPv4Addr
 def ssl_server(resource_dir: Path, port_gen: Generator[int, None, None]) -> Generator[Tuple[str, int], None, None]:
     hostname, port = 'localhost', next(port_gen)
 
-    server = EchoSSLServer((hostname, port), keyfile=resource_dir / 'ssl.key', certfile=resource_dir / 'ssl.cert')
+    ssl_ctx = ssl.SSLContext()
+    ssl_ctx.load_cert_chain(keyfile=resource_dir / 'ssl.key', certfile=resource_dir / 'ssl.cert')
+
+    server = EchoSSLServer((hostname, port), ssl_ctx=ssl_ctx)
     server.start()
     yield hostname, port
     server.stop()
