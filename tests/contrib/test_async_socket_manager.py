@@ -1,4 +1,5 @@
 import asyncio
+import socket
 import ssl
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -31,6 +32,7 @@ class TCPServer:
             host=self._hostname,
             port=self._port,
             ssl=self._ssl_ctx,
+            family=socket.AF_INET,
             reuse_port=True,
         )
         self._server_task = asyncio.create_task(server.serve_forever())
