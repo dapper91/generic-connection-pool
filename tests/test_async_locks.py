@@ -5,6 +5,7 @@ import pytest
 from generic_connection_pool.asyncio.locks import SharedLock
 
 
+@pytest.mark.timeout(5.0)
 async def test_shared_mode():
     lock = SharedLock()
 
@@ -40,6 +41,7 @@ async def test_shared_mode():
         (False, True),
     ],
 )
+@pytest.mark.timeout(5.0)
 async def test_exclusive_mode(delay: float, mode1: bool, mode2: bool):
     lock = SharedLock()
 
@@ -78,6 +80,7 @@ async def test_exclusive_mode(delay: float, mode1: bool, mode2: bool):
         (0.01, False, True),
     ],
 )
+@pytest.mark.timeout(5.0)
 async def test_nonblocking_and_timeout(timeout: float, mode1: bool, mode2: bool):
     lock = SharedLock()
 
@@ -102,6 +105,7 @@ async def test_nonblocking_and_timeout(timeout: float, mode1: bool, mode2: bool)
     await task1
 
 
+@pytest.mark.timeout(5.0)
 async def test_repr():
     task_name = asyncio.current_task().get_name()
     lock = SharedLock()

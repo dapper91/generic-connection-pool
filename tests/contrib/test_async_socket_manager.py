@@ -68,6 +68,7 @@ async def ssl_server(
     await server.stop()
 
 
+@pytest.mark.timeout(5.0)
 async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     loop = asyncio.get_running_loop()
     addr, port = tcp_server
@@ -89,6 +90,7 @@ async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     await pool.close()
 
 
+@pytest.mark.timeout(5.0)
 async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Address, int]):
     addr, port = tcp_server
 
@@ -111,6 +113,7 @@ async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Addr
     await pool.close()
 
 
+@pytest.mark.timeout(5.0)
 async def test_ssl_stream_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
     hostname, port = ssl_server
     ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')

@@ -85,6 +85,7 @@ def connection_manager() -> TestConnectionManager:
     return TestConnectionManager()
 
 
+@pytest.mark.timeout(5.0)
 async def test_params(connection_manager: TestConnectionManager):
     idle_timeout = 10.0
     max_lifetime = 60.0
@@ -111,6 +112,7 @@ async def test_params(connection_manager: TestConnectionManager):
     assert pool.get_size() == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_context_manager(connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager, min_idle=0, idle_timeout=0.0)
 
@@ -130,6 +132,7 @@ async def test_pool_context_manager(connection_manager: TestConnectionManager):
     await pool.close()
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_acquire_round_robin(connection_manager: TestConnectionManager):
     async def fill_endpoint_pool(pool: ConnectionPool, endpoint: int, size: int) -> List[TestConnection]:
         connections = [await pool.acquire(endpoint) for _ in range(size)]
@@ -154,6 +157,7 @@ async def test_pool_acquire_round_robin(connection_manager: TestConnectionManage
     assert pool.get_size() == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_connection_manager_callbacks(connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager)
     async with pool.connection(endpoint=1) as conn:
@@ -166,6 +170,7 @@ async def test_connection_manager_callbacks(connection_manager: TestConnectionMa
     assert pool.get_size() == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_connection_wait(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
@@ -190,6 +195,7 @@ async def test_connection_wait(delay: float, connection_manager: TestConnectionM
     assert pool.get_size() == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_max_size(delay, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
@@ -214,6 +220,7 @@ async def test_pool_max_size(delay, connection_manager: TestConnectionManager):
     await pool.close()
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_total_max_size(delay, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
@@ -239,6 +246,7 @@ async def test_pool_total_max_size(delay, connection_manager: TestConnectionMana
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
+@pytest.mark.timeout(5.0)
 async def test_pool_disposable_connections_collection(
         delay: float,
         connection_manager: TestConnectionManager,
@@ -272,6 +280,7 @@ async def test_pool_disposable_connections_collection(
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
+@pytest.mark.timeout(5.0)
 async def test_pool_min_idle(
         delay: float,
         connection_manager: TestConnectionManager,
@@ -317,6 +326,7 @@ async def test_pool_min_idle(
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
+@pytest.mark.timeout(5.0)
 async def test_pool_idle_timeout(
         delay: float,
         connection_manager: TestConnectionManager,
@@ -350,6 +360,7 @@ async def test_pool_idle_timeout(
     assert pool.get_size() == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_idle_connection_close_on_total_max_size_exceeded(connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
@@ -377,6 +388,7 @@ async def test_idle_connection_close_on_total_max_size_exceeded(connection_manag
 
 
 @pytest.mark.parametrize('background_collector', [True, False])
+@pytest.mark.timeout(5.0)
 async def test_pool_max_lifetime(
         delay: float,
         connection_manager: TestConnectionManager,
@@ -411,6 +423,7 @@ async def test_pool_max_lifetime(
     assert pool.get_size() == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_aliveness_check(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager)
 
@@ -429,10 +442,8 @@ async def test_pool_aliveness_check(delay: float, connection_manager: TestConnec
     assert pool.get_size() == 0
 
 
-async def test_pool_close(
-        delay: float,
-        connection_manager: TestConnectionManager,
-):
+@pytest.mark.timeout(5.0)
+async def test_pool_close(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         idle_timeout=10,
@@ -454,10 +465,8 @@ async def test_pool_close(
     assert pool.get_size() == 0
 
 
-async def test_pool_close_wait(
-        delay: float,
-        connection_manager: TestConnectionManager,
-):
+@pytest.mark.timeout(5.0)
+async def test_pool_close_wait(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](
         connection_manager,
         idle_timeout=10,
@@ -505,10 +514,8 @@ async def test_pool_close_wait(
         await task
 
 
-async def test_pool_close_timeout(
-        delay: float,
-        connection_manager: TestConnectionManager,
-):
+@pytest.mark.timeout(5.0)
+async def test_pool_close_timeout(delay: float, connection_manager: TestConnectionManager):
     pool = ConnectionPool[int, TestConnection](connection_manager)
 
     acquired = asyncio.Event()
@@ -528,6 +535,7 @@ async def test_pool_close_timeout(
     await task
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_connection_manager_creation_error(connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
@@ -542,6 +550,7 @@ async def test_pool_connection_manager_creation_error(connection_manager: TestCo
     assert await pool.get_endpoint_pool_size(endpoint=1) == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_connection_manager_release_error(connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
@@ -573,6 +582,7 @@ async def test_pool_connection_manager_aliveness_error(delay: float, connection_
     assert await pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_connection_manager_dead_connection_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
@@ -591,6 +601,7 @@ async def test_pool_connection_manager_dead_connection_error(delay: float, conne
     assert await pool.get_endpoint_pool_size(endpoint=1) == 0
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_connection_manager_acquire_error(delay: float, connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass
@@ -605,6 +616,7 @@ async def test_pool_connection_manager_acquire_error(delay: float, connection_ma
     assert await pool.get_endpoint_pool_size(endpoint=1, acquired=False) == 1
 
 
+@pytest.mark.timeout(5.0)
 async def test_pool_connection_manager_dispose_error(connection_manager: TestConnectionManager):
     class TestException(Exception):
         pass

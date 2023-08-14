@@ -68,6 +68,7 @@ def ssl_server(resource_dir: Path, port_gen: Generator[int, None, None]) -> Gene
     server.stop()
 
 
+@pytest.mark.timeout(5.0)
 def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     addr, port = tcp_server
 
@@ -88,6 +89,7 @@ def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     pool.close()
 
 
+@pytest.mark.timeout(5.0)
 def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
     hostname, port = ssl_server
     ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
@@ -109,6 +111,7 @@ def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
     pool.close()
 
 
+@pytest.mark.timeout(5.0)
 def test_tcp_socket_manager_timeout(delay, port_gen: Generator[int, None, None]):
     addr, port = IPv4Address('127.0.0.1'), next(port_gen)
 
@@ -127,6 +130,7 @@ def test_tcp_socket_manager_timeout(delay, port_gen: Generator[int, None, None])
     server_sock.close()
 
 
+@pytest.mark.timeout(5.0)
 def test_ssl_socket_manager_timeout(delay, port_gen: Generator[int, None, None]):
     hostname, port = 'localhost', next(port_gen)
 
