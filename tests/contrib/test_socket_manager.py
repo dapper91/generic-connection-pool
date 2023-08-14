@@ -76,8 +76,9 @@ def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
 
     pool = ConnectionPool(TcpSocketConnectionManager())
 
+    attempts = 3
     request = b'test'
-    for _ in range(3):
+    for _ in range(attempts):
         with pool.connection((addr, port)) as sock1:
             sock1.sendall(request)
             response = sock1.recv(len(request))
@@ -98,8 +99,9 @@ def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
 
     pool = ConnectionPool(SslSocketConnectionManager(ssl_context))
 
+    attempts = 3
     request = b'test'
-    for _ in range(3):
+    for _ in range(attempts):
         with pool.connection((hostname, port)) as sock1:
             sock1.sendall(request)
             response = sock1.recv(len(request))

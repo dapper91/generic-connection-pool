@@ -78,8 +78,9 @@ async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
 
     pool = ConnectionPool(TcpSocketConnectionManager())
 
+    attempts = 3
     request = b'test'
-    for _ in range(3):
+    for _ in range(attempts):
         async with pool.connection((addr, port)) as sock1:
             await loop.sock_sendall(sock1, request)
             response = await loop.sock_recv(sock1, len(request))
@@ -99,8 +100,9 @@ async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Addr
 
     pool = ConnectionPool(TcpStreamConnectionManager(ssl=None))
 
+    attempts = 3
     request = b'test'
-    for _ in range(3):
+    for _ in range(attempts):
         async with pool.connection((str(addr), port)) as (reader1, writer1):
             writer1.write(request)
             await writer1.drain()
@@ -123,8 +125,9 @@ async def test_ssl_stream_manager(resource_dir: Path, ssl_server: Tuple[str, int
 
     pool = ConnectionPool(TcpStreamConnectionManager(ssl_context))
 
+    attempts = 3
     request = b'test'
-    for _ in range(3):
+    for _ in range(attempts):
         async with pool.connection((hostname, port)) as (reader1, writer1):
             writer1.write(request)
             await writer1.drain()
