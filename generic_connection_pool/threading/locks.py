@@ -131,9 +131,9 @@ class SharedLock:
         return True
 
     def _release_exclusive(self) -> None:
-        self._lock.release()
         self._exclusive = False
         self._exclusive_owner = None
+        self._lock.release()
 
     def _is_owned(self) -> bool:  # to be compatible with threading.Condition
         return self._exclusive_owner == threading.get_ident()

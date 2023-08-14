@@ -6,6 +6,7 @@ import pytest
 from generic_connection_pool.threading.locks import SharedLock
 
 
+@pytest.mark.timeout(5.0)
 def test_shared_mode():
     lock = SharedLock()
 
@@ -35,6 +36,7 @@ def test_shared_mode():
         (False, True),
     ],
 )
+@pytest.mark.timeout(5.0)
 def test_exclusive_mode(delay: float, mode1: bool, mode2: bool):
     lock = SharedLock()
 
@@ -76,6 +78,7 @@ def test_exclusive_mode(delay: float, mode1: bool, mode2: bool):
         (True, 0.01, False, True),
     ],
 )
+@pytest.mark.timeout(5.0)
 def test_nonblocking_and_timeout(blocking: bool, timeout: float, mode1: bool, mode2: bool):
     lock = SharedLock()
 
@@ -103,6 +106,7 @@ def test_nonblocking_and_timeout(blocking: bool, timeout: float, mode1: bool, mo
     thread1.join()
 
 
+@pytest.mark.timeout(5.0)
 def test_repr():
     thread_id = threading.get_ident()
     lock = SharedLock()

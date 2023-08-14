@@ -7,7 +7,7 @@ license = "Unlicense"
 readme = "README.rst"
 homepage = "https://github.com/dapper91/generic-connection-pool"
 repository = "https://github.com/dapper91/generic-connection-pool"
-documentation = "https://github.com/dapper91/generic-connection-pool"
+documentation = "https://generic-connection-pool.readthedocs.io"
 keywords = ['pool', 'connection-pool', 'asyncio', 'socket', 'tcp']
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -44,6 +44,7 @@ pytest-asyncio = "^0.21.1"
 pytest-mock = "^3.11.1"
 pytest-cov = "^4.1.0"
 types-psycopg2 = "^2.9.21"
+pytest-timeout = "^2.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
