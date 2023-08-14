@@ -151,6 +151,6 @@ class SharedLock:
         return True
 
     def _release_exclusive(self) -> None:
-        self._lock.release()
         self._exclusive = False
         self._exclusive_owner = None
+        self._lock.release()

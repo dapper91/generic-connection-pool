@@ -1,6 +1,13 @@
 Changelog
 =========
 
+0.4.0 (2023-08-15)
+------------------
+
+- socket connection manager aliveness check added
+- shared lock bug fixed
+
+
 0.3.0 (2023-08-10)
 ------------------
 

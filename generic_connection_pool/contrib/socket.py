@@ -3,17 +3,28 @@ Synchronous socket connection manager implementation.
 """
 
 import contextlib
+import errno
 import socket
 from ipaddress import IPv4Address, IPv6Address
 from ssl import SSLContext, SSLSocket
 from typing import Generator, Optional, Tuple, Union
 
-from generic_connection_pool.threading import BaseConnectionManager
+from generic_connection_pool.threading import BaseConnectionManager, EndpointT
 
 IpAddress = Union[IPv4Address, IPv6Address]
 Hostname = str
 Port = int
 TcpEndpoint = Tuple[IpAddress, Port]
+
+
+@contextlib.contextmanager
+def socket_nonblocking(sock: socket.socket) -> Generator[None, None, None]:
+    orig_timeout = sock.gettimeout()
+    sock.settimeout(0)
+    try:
+        yield
+    finally:
+        sock.settimeout(orig_timeout)
 
 
 @contextlib.contextmanager
@@ -65,6 +76,19 @@ class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socke
 
         conn.close()
 
+    def check_aliveness(self, endpoint: EndpointT, conn: socket.socket, timeout: Optional[float] = None) -> bool:
+        try:
+            with socket_nonblocking(conn):
+                if conn.recv(1, socket.MSG_PEEK) == b'':
+                    return False
+        except BlockingIOError as exc:
+            if exc.errno != errno.EAGAIN:
+                raise
+        except OSError:
+            return False
+
+        return True
+
 
 SslEndpoint = Tuple[Hostname, Port]
 
@@ -94,3 +118,17 @@ class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, SSLSocket]):
             pass
 
         conn.close()
+
+    def check_aliveness(self, endpoint: EndpointT, conn: socket.socket, timeout: Optional[float] = None) -> bool:
+        try:
+            with socket_nonblocking(conn):
+                # peek into the plain socket since ssl socket doesn't support flags
+                if socket.socket.recv(conn, 1, socket.MSG_PEEK) == b'':
+                    return False
+        except BlockingIOError as exc:
+            if exc.errno != errno.EAGAIN:
+                raise
+        except OSError:
+            return False
+
+        return True
