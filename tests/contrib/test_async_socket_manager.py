@@ -14,9 +14,10 @@ from generic_connection_pool.contrib.socket_async import TcpSocketConnectionMana
 class TCPServer:
     @staticmethod
     async def echo_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        data = await reader.read(1500)
-        writer.write(data)
-        await writer.drain()
+        while data := await reader.read(1024):
+            writer.write(data)
+            await writer.drain()
+
         writer.close()
         await writer.wait_closed()
 
@@ -103,13 +104,13 @@ async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Addr
         async with pool.connection((str(addr), port)) as (reader1, writer1):
             writer1.write(request)
             await writer1.drain()
-            response = await reader1.read()
+            response = await reader1.read(len(request))
             assert response == request
 
             async with pool.connection((str(addr), port)) as (reader2, writer2):
                 writer2.write(request)
                 await writer2.drain()
-                response = await reader2.read()
+                response = await reader2.read(len(request))
                 assert response == request
 
     await pool.close()
@@ -127,13 +128,13 @@ async def test_ssl_stream_manager(resource_dir: Path, ssl_server: Tuple[str, int
         async with pool.connection((hostname, port)) as (reader1, writer1):
             writer1.write(request)
             await writer1.drain()
-            response = await reader1.read()
+            response = await reader1.read(len(request))
             assert response == request
 
             async with pool.connection((hostname, port)) as (reader2, writer2):
                 writer2.write(request)
                 await writer2.drain()
-                response = await reader2.read()
+                response = await reader2.read(len(request))
                 assert response == request
 
     await pool.close()

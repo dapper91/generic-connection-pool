@@ -17,8 +17,8 @@ class EchoTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
     class EchoRequestHandler(socketserver.BaseRequestHandler):
         def handle(self):
-            data = self.request.recv(1500)
-            self.request.sendall(data)
+            while data := self.request.recv(1024):
+                self.request.sendall(data)
 
     def __init__(self, server_address: Tuple[str, int]):
         super().__init__(server_address, self.EchoRequestHandler)
