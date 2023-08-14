@@ -61,7 +61,7 @@ def tcp_server(port_gen: Generator[int, None, None]) -> Generator[Tuple[IPv4Addr
 def ssl_server(resource_dir: Path, port_gen: Generator[int, None, None]) -> Generator[Tuple[str, int], None, None]:
     hostname, port = 'localhost', next(port_gen)
 
-    ssl_ctx = ssl.SSLContext()
+    ssl_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_SERVER)
     ssl_ctx.load_cert_chain(keyfile=resource_dir / 'ssl.key', certfile=resource_dir / 'ssl.cert')
 
     server = EchoSSLServer((hostname, port), ssl_ctx=ssl_ctx)
