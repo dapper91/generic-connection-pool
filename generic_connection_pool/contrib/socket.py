@@ -7,7 +7,7 @@ import errno
 import socket
 from ipaddress import IPv4Address, IPv6Address
 from ssl import SSLContext, SSLSocket
-from typing import Generator, Optional, Tuple, Union
+from typing import Generator, Generic, Optional, Tuple, Union
 
 from generic_connection_pool.threading import BaseConnectionManager, EndpointT
 
@@ -46,7 +46,29 @@ def socket_timeout(sock: socket.socket, timeout: Optional[float]) -> Generator[N
         sock.settimeout(orig_timeout)
 
 
-class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socket]):
+class SocketAlivenessCheckingMixin(Generic[EndpointT]):
+    """
+    Socket aliveness checking mix-in.
+    """
+
+    def check_aliveness(self, endpoint: EndpointT, conn: socket.socket, timeout: Optional[float] = None) -> bool:
+        try:
+            with socket_nonblocking(conn):
+                if conn.recv(1, socket.MSG_PEEK) == b'':
+                    return False
+        except BlockingIOError as exc:
+            if exc.errno != errno.EAGAIN:
+                raise
+        except OSError:
+            return False
+
+        return True
+
+
+class TcpSocketConnectionManager(
+    SocketAlivenessCheckingMixin[TcpEndpoint],
+    BaseConnectionManager[TcpEndpoint, socket.socket],
+):
     """
     TCP socket connection manager.
     """
@@ -76,10 +98,17 @@ class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socke
 
         conn.close()
 
-    def check_aliveness(self, endpoint: EndpointT, conn: socket.socket, timeout: Optional[float] = None) -> bool:
+
+class SslSocketAlivenessCheckingMixin(Generic[EndpointT]):
+    """
+    SSL socket aliveness checking mix-in.
+    """
+
+    def check_aliveness(self, endpoint: EndpointT, conn: SSLSocket, timeout: Optional[float] = None) -> bool:
         try:
             with socket_nonblocking(conn):
-                if conn.recv(1, socket.MSG_PEEK) == b'':
+                # peek into the plain socket since ssl socket doesn't support flags
+                if socket.socket.recv(conn, 1, socket.MSG_PEEK) == b'':
                     return False
         except BlockingIOError as exc:
             if exc.errno != errno.EAGAIN:
@@ -93,7 +122,10 @@ class TcpSocketConnectionManager(BaseConnectionManager[TcpEndpoint, socket.socke
 SslEndpoint = Tuple[Hostname, Port]
 
 
-class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, SSLSocket]):
+class SslSocketConnectionManager(
+    SslSocketAlivenessCheckingMixin[SslEndpoint],
+    BaseConnectionManager[SslEndpoint, SSLSocket],
+):
     """
     SSL socket connection manager.
     """
@@ -118,17 +150,3 @@ class SslSocketConnectionManager(BaseConnectionManager[SslEndpoint, SSLSocket]):
             pass
 
         conn.close()
-
-    def check_aliveness(self, endpoint: EndpointT, conn: socket.socket, timeout: Optional[float] = None) -> bool:
-        try:
-            with socket_nonblocking(conn):
-                # peek into the plain socket since ssl socket doesn't support flags
-                if socket.socket.recv(conn, 1, socket.MSG_PEEK) == b'':
-                    return False
-        except BlockingIOError as exc:
-            if exc.errno != errno.EAGAIN:
-                raise
-        except OSError:
-            return False
-
-        return True
