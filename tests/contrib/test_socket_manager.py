@@ -16,7 +16,7 @@ class EchoTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
     class EchoRequestHandler(socketserver.BaseRequestHandler):
-        def handle(self):
+        def handle(self) -> None:
             while data := self.request.recv(1024):
                 self.request.sendall(data)
 
@@ -41,7 +41,7 @@ class EchoSSLServer(EchoTCPServer):
         super().__init__(server_address)
         self._ssl_ctx = ssl_ctx
 
-    def get_request(self):
+    def get_request(self) -> Tuple[socket.socket, Tuple[str, int]]:
         sock, addr = super().get_request()
         ssl_socket = self._ssl_ctx.wrap_socket(sock, server_side=True)
         return ssl_socket, addr
@@ -74,7 +74,9 @@ def ssl_server(resource_dir: Path, port_gen: Generator[int, None, None]) -> Gene
 def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     addr, port = tcp_server
 
-    pool = ConnectionPool(TcpSocketConnectionManager())
+    pool = ConnectionPool[Tuple[IPv4Address, int], socket.socket](
+        TcpSocketConnectionManager(),
+    )
 
     attempts = 3
     request = b'test'
@@ -97,7 +99,9 @@ def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
     hostname, port = ssl_server
     ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
 
-    pool = ConnectionPool(SslSocketConnectionManager(ssl_context))
+    pool = ConnectionPool[Tuple[str, int], socket.socket](
+        SslSocketConnectionManager(ssl_context),
+    )
 
     attempts = 3
     request = b'test'
@@ -116,14 +120,16 @@ def test_ssl_socket_manager(resource_dir: Path, ssl_server: Tuple[str, int]):
 
 
 @pytest.mark.timeout(5.0)
-def test_tcp_socket_manager_timeout(delay, port_gen: Generator[int, None, None]):
+def test_tcp_socket_manager_timeout(delay: float, port_gen: Generator[int, None, None]):
     addr, port = IPv4Address('127.0.0.1'), next(port_gen)
 
     server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     server_sock.bind((str(addr), port))
     server_sock.listen(1)
 
-    pool = ConnectionPool(TcpSocketConnectionManager())
+    pool = ConnectionPool[Tuple[IPv4Address, int], socket.socket](
+        TcpSocketConnectionManager(),
+    )
     with pytest.raises(TimeoutError):
         with pool.connection(endpoint=(addr, port), timeout=delay):
             with pool.connection(endpoint=(addr, port), timeout=delay):
@@ -135,14 +141,16 @@ def test_tcp_socket_manager_timeout(delay, port_gen: Generator[int, None, None])
 
 
 @pytest.mark.timeout(5.0)
-def test_ssl_socket_manager_timeout(delay, port_gen: Generator[int, None, None]):
+def test_ssl_socket_manager_timeout(delay: float, port_gen: Generator[int, None, None]):
     hostname, port = 'localhost', next(port_gen)
 
     server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     server_sock.bind((hostname, port))
     server_sock.listen(1)
 
-    pool = ConnectionPool(SslSocketConnectionManager(ssl.create_default_context()))
+    pool = ConnectionPool[Tuple[str, int], socket.socket](
+        SslSocketConnectionManager(ssl.create_default_context()),
+    )
     with pytest.raises(TimeoutError):
         with pool.connection(endpoint=(hostname, port), timeout=delay):
             with pool.connection(endpoint=(hostname, port), timeout=delay):

@@ -1,12 +1,13 @@
 import socket
-from ipaddress import IPv4Address
-from typing import Tuple
+from ipaddress import IPv4Address, IPv6Address
+from typing import Tuple, Union
 
 from generic_connection_pool.contrib.socket import TcpSocketConnectionManager
 from generic_connection_pool.threading import ConnectionPool
 
 Port = int
-Endpoint = Tuple[IPv4Address, Port]
+IpAddress = Union[IPv4Address, IPv6Address]
+Endpoint = Tuple[IpAddress, Port]
 Connection = socket.socket
 
 
@@ -21,7 +22,7 @@ redis_pool = ConnectionPool[Endpoint, Connection](
 )
 
 
-def command(addr: IPv4Address, port: int, cmd: str) -> None:
+def command(addr: IpAddress, port: int, cmd: str) -> None:
     with redis_pool.connection(endpoint=(addr, port), timeout=5.0) as sock:
         sock.sendall(cmd.encode() + b'\n')
         response = sock.recv(1024)
