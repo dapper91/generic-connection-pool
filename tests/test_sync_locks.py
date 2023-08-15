@@ -13,7 +13,7 @@ def test_shared_mode():
     thread_cnt = 5
     barrier = threading.Barrier(thread_cnt)
 
-    def acquire_connection():
+    def acquire_connection() -> None:
         with lock.acquired(exclusive=False):
             barrier.wait()
 
@@ -43,7 +43,7 @@ def test_exclusive_mode(delay: float, mode1: bool, mode2: bool):
     locked = threading.Event()
     stopped = threading.Event()
 
-    def acquire_connection(exclusive):
+    def acquire_connection(exclusive: bool):
         with lock.acquired(exclusive=exclusive):
             locked.set()
             stopped.wait()
@@ -85,7 +85,7 @@ def test_nonblocking_and_timeout(blocking: bool, timeout: float, mode1: bool, mo
     locked = threading.Event()
     stopped = threading.Event()
 
-    def acquire_blocking():
+    def acquire_blocking() -> None:
         with lock.acquired(exclusive=mode1):
             locked.set()
             stopped.wait()
@@ -95,7 +95,7 @@ def test_nonblocking_and_timeout(blocking: bool, timeout: float, mode1: bool, mo
 
     locked.wait()
 
-    def acquire_nonblocking():
+    def acquire_nonblocking() -> None:
         assert not lock.acquire(exclusive=mode2, blocking=blocking, timeout=timeout)
 
     thread2 = threading.Thread(target=acquire_nonblocking)

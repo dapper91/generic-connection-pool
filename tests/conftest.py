@@ -11,7 +11,7 @@ def test_dir() -> Path:
 
 
 @pytest.fixture(scope='session')
-def resource_dir(test_dir) -> Path:
+def resource_dir(test_dir: Path) -> Path:
     return test_dir / 'resources'
 
 
@@ -21,13 +21,13 @@ def init_random() -> None:
 
 
 @pytest.fixture(scope='session')
-def delay(pytestconfig) -> float:
+def delay(pytestconfig: pytest.Config) -> float:
     return pytestconfig.getoption('--delay', 0.05)
 
 
 @pytest.fixture(scope='session')
 def port_gen() -> Generator[int, None, None]:
-    def gen():
+    def gen() -> Generator[int, None, None]:
         for port in range(10000, 65535):
             yield port
 

@@ -61,7 +61,11 @@ class TcpSocketConnectionManager(
         return sock
 
     async def dispose(self, endpoint: TcpEndpoint, conn: socket.socket) -> None:
-        conn.shutdown(socket.SHUT_RDWR)
+        try:
+            conn.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
         conn.close()
 
 

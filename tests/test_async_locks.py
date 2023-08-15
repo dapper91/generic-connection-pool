@@ -48,7 +48,7 @@ async def test_exclusive_mode(delay: float, mode1: bool, mode2: bool):
     locked = asyncio.Event()
     stopped = asyncio.Event()
 
-    async def acquire_connection(exclusive):
+    async def acquire_connection(exclusive: bool):
         async with lock.acquired(exclusive=exclusive):
             locked.set()
             await stopped.wait()
@@ -87,7 +87,7 @@ async def test_nonblocking_and_timeout(timeout: float, mode1: bool, mode2: bool)
     locked = asyncio.Event()
     stopped = asyncio.Event()
 
-    async def acquire_blocking():
+    async def acquire_blocking() -> None:
         async with lock.acquired(exclusive=mode1):
             locked.set()
             await stopped.wait()
@@ -95,7 +95,7 @@ async def test_nonblocking_and_timeout(timeout: float, mode1: bool, mode2: bool)
     task1 = asyncio.create_task(acquire_blocking())
     await locked.wait()
 
-    async def acquire_nonblocking():
+    async def acquire_nonblocking() -> None:
         assert not await lock.acquire(exclusive=mode2, timeout=timeout)
 
     task2 = asyncio.create_task(acquire_nonblocking())
