@@ -35,3 +35,6 @@ _______
 
 .. automodule:: generic_connection_pool.contrib.unix
     :members:
+
+.. automodule:: generic_connection_pool.contrib.unix_async
+    :members:
