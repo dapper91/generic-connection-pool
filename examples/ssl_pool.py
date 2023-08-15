@@ -1,4 +1,3 @@
-import socket
 import ssl
 import urllib.parse
 from http.client import HTTPResponse
@@ -10,7 +9,7 @@ from generic_connection_pool.threading import ConnectionPool
 Hostname = str
 Port = int
 Endpoint = Tuple[Hostname, Port]
-Connection = socket.socket
+Connection = ssl.SSLSocket
 
 
 http_pool = ConnectionPool[Endpoint, Connection](

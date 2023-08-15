@@ -125,6 +125,14 @@ The following example illustrate how to implement a custom connection manager fo
   :language: python
 
 
+Connection manager allows to define methods to be called on connection acquire, release or when
+a connection determined to be dead. That helps to log pool actions or collect metrics.
+The following examples illustrate how to collect pool metrics and export them to prometheus.
+
+.. literalinclude:: ../../../examples/manager_hooks.py
+  :language: python
+
+
 Examples
 ________
 
