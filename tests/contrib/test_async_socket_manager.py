@@ -8,12 +8,12 @@ from typing import AsyncGenerator, Generator, Optional, Tuple
 import pytest
 
 from generic_connection_pool.asyncio import ConnectionPool
-from generic_connection_pool.contrib.socket_async import TcpSocketConnectionManager, TcpStreamConnectionManager
+from generic_connection_pool.contrib.socket_async import Stream, TcpSocketConnectionManager, TcpStreamConnectionManager
 
 
-class TCPServer:
+class EchoTCPServer:
     @staticmethod
-    async def echo_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def echo_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         while data := await reader.read(1024):
             writer.write(data)
             await writer.drain()
@@ -35,6 +35,7 @@ class TCPServer:
             ssl=self._ssl_ctx,
             family=socket.AF_INET,
             reuse_port=True,
+            start_serving=False,
         )
         self._server_task = asyncio.create_task(server.serve_forever())
 
@@ -50,7 +51,7 @@ class TCPServer:
 @pytest.fixture
 async def tcp_server(port_gen: Generator[int, None, None]) -> AsyncGenerator[Tuple[IPv4Address, int], None]:
     addr, port = IPv4Address('127.0.0.1'), next(port_gen)
-    server = TCPServer(str(addr), port)
+    server = EchoTCPServer(str(addr), port)
     await server.start()
     yield addr, port
     await server.stop()
@@ -65,7 +66,7 @@ async def ssl_server(
     ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     ssl_ctx.load_cert_chain(resource_dir / 'ssl.cert', resource_dir / 'ssl.key')
 
-    server = TCPServer(hostname, port, ssl_ctx=ssl_ctx)
+    server = EchoTCPServer(hostname, port, ssl_ctx=ssl_ctx)
     await server.start()
     yield hostname, port
     await server.stop()
@@ -76,7 +77,9 @@ async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
     loop = asyncio.get_running_loop()
     addr, port = tcp_server
 
-    pool = ConnectionPool(TcpSocketConnectionManager())
+    pool = ConnectionPool[Tuple[IPv4Address, int], socket.socket](
+        TcpSocketConnectionManager(),
+    )
 
     attempts = 3
     request = b'test'
@@ -98,7 +101,9 @@ async def test_tcp_socket_manager(tcp_server: Tuple[IPv4Address, int]):
 async def test_tcp_stream_manager(resource_dir: Path, tcp_server: Tuple[IPv4Address, int]):
     addr, port = tcp_server
 
-    pool = ConnectionPool(TcpStreamConnectionManager(ssl=None))
+    pool = ConnectionPool[Tuple[IPv4Address, int], Stream](
+        TcpStreamConnectionManager(ssl=None),
+    )
 
     attempts = 3
     request = b'test'
@@ -123,7 +128,9 @@ async def test_ssl_stream_manager(resource_dir: Path, ssl_server: Tuple[str, int
     hostname, port = ssl_server
     ssl_context = ssl.create_default_context(cafile=resource_dir / 'ssl.cert')
 
-    pool = ConnectionPool(TcpStreamConnectionManager(ssl_context))
+    pool = ConnectionPool[Tuple[str, int], Stream](
+        TcpStreamConnectionManager(ssl_context),
+    )
 
     attempts = 3
     request = b'test'
