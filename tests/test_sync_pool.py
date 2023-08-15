@@ -23,7 +23,7 @@ class MockConnection:
 
 
 class MockConnectionManager(BaseConnectionManager[int, MockConnection]):
-    def __init__(self):
+    def __init__(self) -> None:
         self.creations: List[Tuple[int, MockConnection]] = []
         self.disposals: List[MockConnection] = []
         self.acquires: List[MockConnection] = []
@@ -135,7 +135,7 @@ def test_pool_context_manager(connection_manager: MockConnectionManager):
 
 @pytest.mark.timeout(5.0)
 def test_pool_acquire_round_robin(connection_manager: MockConnectionManager):
-    def fill_endpoint_pool(pool: ConnectionPool, endpoint: int, size: int) -> List[MockConnection]:
+    def fill_endpoint_pool(pool: ConnectionPool[int, MockConnection], endpoint: int, size: int) -> List[MockConnection]:
         connections = [pool.acquire(endpoint) for _ in range(size)]
         for conn in connections:
             pool.release(conn, endpoint)
@@ -178,7 +178,7 @@ def test_connection_wait(delay: float, connection_manager: MockConnectionManager
         max_size=1,
     )
 
-    def acquire_connection(timeout):
+    def acquire_connection(timeout: float):
         with pool.connection(endpoint=1, timeout=timeout):
             time.sleep(delay)
             assert pool.get_size() == 1
@@ -201,7 +201,7 @@ def test_connection_wait(delay: float, connection_manager: MockConnectionManager
 
 
 @pytest.mark.timeout(5.0)
-def test_pool_max_size(delay, connection_manager: MockConnectionManager):
+def test_pool_max_size(delay: float, connection_manager: MockConnectionManager):
     pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=0,
@@ -226,7 +226,7 @@ def test_pool_max_size(delay, connection_manager: MockConnectionManager):
 
 
 @pytest.mark.timeout(5.0)
-def test_pool_total_max_size(delay, connection_manager: MockConnectionManager):
+def test_pool_total_max_size(delay: float, connection_manager: MockConnectionManager):
     pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=0,
@@ -488,7 +488,7 @@ def test_pool_close_wait(delay: float, connection_manager: MockConnectionManager
 
     barrier = threading.Barrier(thread_cnt + 1)
 
-    def acquire_connection(endpoint, delay):
+    def acquire_connection(endpoint: int, delay: float):
         with contextlib.suppress(exceptions.ConnectionPoolClosedError):
             with pool.connection(endpoint=endpoint):
                 barrier.wait()
@@ -520,7 +520,7 @@ def test_pool_close_timeout(delay: float, connection_manager: MockConnectionMana
 
     acquired = threading.Event()
 
-    def acquire_connection():
+    def acquire_connection() -> None:
         with contextlib.suppress(exceptions.ConnectionPoolClosedError):
             with pool.connection(endpoint=1):
                 acquired.set()

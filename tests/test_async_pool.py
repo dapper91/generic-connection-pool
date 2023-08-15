@@ -134,7 +134,11 @@ async def test_pool_context_manager(connection_manager: MockConnectionManager):
 
 @pytest.mark.timeout(5.0)
 async def test_pool_acquire_round_robin(connection_manager: MockConnectionManager):
-    async def fill_endpoint_pool(pool: ConnectionPool, endpoint: int, size: int) -> List[MockConnection]:
+    async def fill_endpoint_pool(
+            pool: ConnectionPool[int, MockConnection],
+            endpoint: int,
+            size: int,
+    ) -> List[MockConnection]:
         connections = [await pool.acquire(endpoint) for _ in range(size)]
         for conn in connections:
             await pool.release(conn, endpoint)
@@ -177,7 +181,7 @@ async def test_connection_wait(delay: float, connection_manager: MockConnectionM
         max_size=1,
     )
 
-    async def acquire_connection(timeout):
+    async def acquire_connection(timeout: float) -> None:
         async with pool.connection(endpoint=1, timeout=timeout):
             await asyncio.sleep(delay)
             assert pool.get_size() == 1
@@ -196,7 +200,7 @@ async def test_connection_wait(delay: float, connection_manager: MockConnectionM
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_max_size(delay, connection_manager: MockConnectionManager):
+async def test_pool_max_size(delay: float, connection_manager: MockConnectionManager):
     pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=0,
@@ -221,7 +225,7 @@ async def test_pool_max_size(delay, connection_manager: MockConnectionManager):
 
 
 @pytest.mark.timeout(5.0)
-async def test_pool_total_max_size(delay, connection_manager: MockConnectionManager):
+async def test_pool_total_max_size(delay: float, connection_manager: MockConnectionManager):
     pool = ConnectionPool[int, MockConnection](
         connection_manager,
         min_idle=0,
@@ -485,7 +489,7 @@ async def test_pool_close_wait(delay: float, connection_manager: MockConnectionM
     acquire_event = asyncio.Event()
     finished = asyncio.Event()
 
-    async def acquire_connection(endpoint, delay):
+    async def acquire_connection(endpoint: int, delay: float):
         nonlocal acquire_cnt
 
         with contextlib.suppress(exceptions.ConnectionPoolClosedError):
@@ -520,7 +524,7 @@ async def test_pool_close_timeout(delay: float, connection_manager: MockConnecti
 
     acquired = asyncio.Event()
 
-    async def acquire_connection():
+    async def acquire_connection() -> None:
         with contextlib.suppress(exceptions.ConnectionPoolClosedError):
             async with pool.connection(endpoint=1):
                 acquired.set()
