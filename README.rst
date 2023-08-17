@@ -52,6 +52,11 @@ Connection pool supports the following configurations:
 * **total_max_size**: maximum number of all connections in the pool.
 
 
+.. image:: /static/connection-pool.svg
+  :width: 1024
+  :alt: Connection Pool parameters
+
+
 The following example illustrates how to create https pool:
 
 .. code-block:: python
