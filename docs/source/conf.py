@@ -52,12 +52,12 @@ autosectionlabel_prefix_document = True
 html_theme_options = {}
 html_title = PROJECT_INFO['name']
 
-templates_path = ['_templates']
+templates_path = ['templates']
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'furo'
-html_static_path = ['_static']
+html_static_path = ['static']
 html_css_files = ['css/custom.css']
