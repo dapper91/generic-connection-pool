@@ -13,7 +13,7 @@ class ComparableAndHashable(ComparableP, Protocol, Hashable):
 Item = TypeVar('Item', bound=ComparableAndHashable)
 
 
-class ExtHeap(Generic[Item]):
+class RankMap(Generic[Item]):
     """
     Extended heap data structure implementation.
     Similar to `heapq` but supports remove and replace operations.
