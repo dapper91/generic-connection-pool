@@ -27,9 +27,7 @@ class CheckSocketAlivenessMixin(Generic[EndpointT]):
 
     def check_aliveness(self, endpoint: EndpointT, conn: socket.socket, timeout: Optional[float] = None) -> bool:
         try:
-            with socket_timeout(conn, timeout):
-                resp = conn.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT)
-            if resp == b'':
+            if conn.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT) == b'':
                 return False
         except BlockingIOError as exc:
             if exc.errno != errno.EAGAIN:
