@@ -6,7 +6,7 @@ from enum import IntEnum
 from typing import Dict, Generic, Hashable, Optional, Tuple, TypeVar
 
 from . import exceptions
-from .heap import ExtHeap
+from .rankmap import RankMap
 
 logger = logging.getLogger(__package__)
 
@@ -279,7 +279,7 @@ class BaseEventQueue(Generic[KeyType]):
     """
 
     def __init__(self) -> None:
-        self._queue: ExtHeap[Event[KeyType]] = ExtHeap()
+        self._queue: RankMap[Event[KeyType]] = RankMap()
 
     def _insert(self, timestamp: float, key: KeyType) -> None:
         """
