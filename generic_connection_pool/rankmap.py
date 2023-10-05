@@ -1,4 +1,4 @@
-from typing import Any, Dict, Generic, Hashable, List, Optional, Protocol, TypeVar
+from typing import Any, Dict, Hashable, Iterator, List, MutableMapping, Optional, Protocol, Tuple, TypeVar
 
 
 class ComparableP(Protocol):
@@ -6,23 +6,20 @@ class ComparableP(Protocol):
     def __eq__(self, other: Any) -> bool: ...
 
 
-class ComparableAndHashable(ComparableP, Protocol, Hashable):
-    pass
+Key = TypeVar('Key', bound=Hashable)
+Value = TypeVar('Value', bound=ComparableP)
 
 
-Item = TypeVar('Item', bound=ComparableAndHashable)
-
-
-class RankMap(Generic[Item]):
+class RankMap(MutableMapping[Key, Value]):
     """
-    Extended heap data structure implementation.
-    Similar to `heapq` but supports remove and replace operations.
-    To support remove and replace operations items must be unique.
+    A hash-map / binary-heap combined data structure that additionally supports the following operations:
+        - top: get the element with the lowest value in O(1)
+        - next: removes the element with the lowest value in O(log(n))
     """
 
     def __init__(self) -> None:
-        self._heap: List[Item] = []
-        self._index: Dict[Item, int] = {}
+        self._heap: List[Tuple[Value, Key]] = []
+        self._index: Dict[Key, int] = {}
 
     def __len__(self) -> int:
         return len(self._heap)
@@ -30,47 +27,68 @@ class RankMap(Generic[Item]):
     def __bool__(self) -> bool:
         return bool(self._heap)
 
-    def __contains__(self, item: Item) -> bool:
-        return item in self._index
+    def __getitem__(self, key: Key) -> Value:
+        idx = self._index[key]
+        value, key = self._heap[idx]
+
+        return value
+
+    def __setitem__(self, key: Key, value: Value) -> None:
+        self.insert_or_replace(key, value)
+
+    def __delitem__(self, key: Key) -> None:
+        self.remove(key)
+
+    def __iter__(self) -> Iterator[Key]:
+        return (key for value, key in self._heap)
 
     def clear(self) -> None:
         """
-        Remove all items from the heap.
+        Remove all items from the map.
         """
 
         self._heap.clear()
         self._index.clear()
 
-    def insert(self, item: Item) -> None:
+    def insert(self, key: Key, value: Value) -> None:
         """
-        Inserts an item onto the heap, maintaining the heap invariant.
-        If the item already presented raises `KeyError`.
+        Inserts an item into the map.
+        If an item with the provided key already presented raises `KeyError`.
 
-        :param item: item to be pushed
+        :param key: item key
+        :param value: item value
         """
 
-        if item in self._index:
-            raise KeyError("item already exists")
+        if key in self._index:
+            raise KeyError("key already exists")
 
         item_idx = len(self._heap)
-        self._heap.append(item)
-        self._index[item] = item_idx
+        self._heap.append((value, key))
+        self._index[key] = item_idx
 
         self._siftdown(item_idx)
 
-    def insert_or_replace(self, item: Item) -> None:
+    def insert_or_replace(self, key: Key, value: Value) -> Optional[Value]:
         """
-        Inserts an item onto the heap or replaces it if it already exists.
+        Inserts an item into the map or replaces it if it already exists.
+
+        :param key: item key
+        :param value: item value
+        :return: previous item or `None`
         """
 
-        if item in self._index:
-            self.remove(item)
+        if key in self._index:
+            prev = self.remove(key)
+        else:
+            prev = None
 
-        self.insert(item)
+        self.insert(key, value)
 
-    def pop(self) -> Optional[Item]:
+        return prev
+
+    def next(self) -> Optional[Value]:
         """
-        Pops the smallest item off the heap, maintaining the heap invariant.
+        Pops the smallest item from the map.
 
         :return: the smallest item
         """
@@ -78,107 +96,88 @@ class RankMap(Generic[Item]):
         if len(self._heap) == 0:
             return None
 
-        last_item = self._heap.pop()
-        self._index.pop(last_item)
+        value, key = self._heap[0]
+        return self.remove(key)
 
-        if self._heap:
-            first_item = self._heap[0]
-            self._index.pop(first_item)
-            self._heap[0] = last_item
-            self._index[last_item] = 0
-            self._siftup(0)
-            return first_item
+    def top(self) -> Optional[Value]:
+        """
+        Returns the smallest item from the map.
 
-        else:
-            return last_item
+        :return: the smallest item
+        """
 
-    def top(self) -> Optional[Item]:
         if len(self._heap) != 0:
-            return self._heap[0]
+            first_value, first_key = self._heap[0]
+            return first_value
         else:
             return None
 
-    def remove(self, item: Item) -> None:
+    def remove(self, key: Key) -> Optional[Value]:
         """
-        Removes an item from the heap.
+        Removes an item from the map
 
-        :param item: item to be removed
+        :param key: item key
+        :returns: removed item value
         """
 
-        if item not in self._index:
-            return
+        if (idx := self._index.get(key)) is None:
+            return None
 
-        idx = self._index.pop(item)
-        if idx == len(self._heap) - 1:
-            self._heap.pop()
-        else:
-            last_item = self._heap[-1]
-            self._heap[idx] = last_item
-            self._heap.pop()
-            self._index[last_item] = idx
+        self._swap_heap_elements(idx, len(self._heap) - 1)
+
+        value, key = self._heap.pop()
+        self._index.pop(key)
+
+        if idx < len(self._heap):
+            self._siftdown(idx)
             self._siftup(idx)
 
-    def replace(self, old_item: Item, new_item: Item) -> None:
-        """
-        Replaces an item with the new one, maintaining the heap invariant.
-        If the old_item not presented raises `KeyError`.
-        If the new_item already presented raises `KeyError`.
+        return value
 
-        :param old_item: item to be replaces
-        :param new_item: item the old one is replaced by
-        """
+    def _swap_heap_elements(self, idx1: int, idx2: int) -> None:
+        key1 = self._heap[idx1][1]
+        key2 = self._heap[idx2][1]
 
-        if old_item not in self._index:
-            raise KeyError("item not found")
-
-        if new_item in self._index:
-            raise KeyError("item already exists")
-
-        old_idx = self._index.pop(old_item)
-        self._heap[old_idx] = new_item
-        self._index[new_item] = old_idx
-
-        if new_item < old_item:
-            self._siftdown(old_idx)
-        else:
-            self._siftup(old_idx)
+        self._heap[idx1], self._heap[idx2] = self._heap[idx2], self._heap[idx1]
+        self._index[key1] = idx2
+        self._index[key2] = idx1
 
     def _siftup(self, idx: int) -> None:
-        item = self._heap[idx]
+        value, key = self._heap[idx]
 
         left_child_idx = 2 * idx + 1
         while left_child_idx < len(self._heap):
             right_child_idx = left_child_idx + 1
-            if right_child_idx >= len(self._heap) or self._heap[left_child_idx] < self._heap[right_child_idx]:
+            if right_child_idx >= len(self._heap) or self._heap[left_child_idx][0] < self._heap[right_child_idx][0]:
                 min_child_idx = left_child_idx
             else:
                 min_child_idx = right_child_idx
 
-            child = self._heap[min_child_idx]
-            if item < child or item == child:
+            child_value, child_key = self._heap[min_child_idx]
+            if value < child_value or value == child_value:
                 break
 
-            self._heap[idx] = child
-            self._index[child] = idx
+            self._heap[idx] = child_value, child_key
+            self._index[child_key] = idx
 
             idx = min_child_idx
             left_child_idx = 2 * idx + 1
 
-        self._heap[idx] = item
-        self._index[item] = idx
+        self._heap[idx] = value, key
+        self._index[key] = idx
 
     def _siftdown(self, idx: int) -> None:
-        item = self._heap[idx]
+        value, key = self._heap[idx]
 
         while idx > 0:
             parent_idx = (idx - 1) // 2
-            parent = self._heap[parent_idx]
-            if item < parent:
-                self._heap[idx] = parent
-                self._index[parent] = idx
+            parent_value, parent_key = self._heap[parent_idx]
+            if value < parent_value:
+                self._heap[idx] = parent_value, parent_key
+                self._index[parent_key] = idx
                 idx = parent_idx
             else:
                 break
 
-        self._heap[idx] = item
-        self._index[item] = idx
+        self._heap[idx] = value, key
+        self._index[key] = idx
