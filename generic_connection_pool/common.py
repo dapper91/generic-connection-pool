@@ -279,21 +279,21 @@ class BaseEventQueue(Generic[KeyType]):
     """
 
     def __init__(self) -> None:
-        self._queue: RankMap[Event[KeyType]] = RankMap()
+        self._queue: RankMap[KeyType, Event[KeyType]] = RankMap()
 
     def _insert(self, timestamp: float, key: KeyType) -> None:
         """
         Adds a new event to the queue.
         """
 
-        self._queue.insert_or_replace(Event(timestamp, key))
+        self._queue.insert_or_replace(key, Event(timestamp, key))
 
     def _remove(self, key: KeyType) -> None:
         """
         Remove an event from the queue.
         """
 
-        self._queue.remove(Event(0.0, key))
+        self._queue.remove(key)
 
     def _clear(self) -> None:
         """
