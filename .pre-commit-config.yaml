@@ -25,13 +25,13 @@ repos:
         args:
           - --fix=no
   - repo: https://github.com/asottile/add-trailing-comma
-    rev: v2.4.0
+    rev: v3.1.0
     hooks:
       - id: add-trailing-comma
         stages:
           - commit
   - repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v2.0.2
+    rev: v2.0.4
     hooks:
       - id: autopep8
         stages:
@@ -39,7 +39,7 @@ repos:
         args:
           - --diff
   - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
+    rev: 6.1.0
     hooks:
       - id: flake8
   - repo: https://github.com/pycqa/isort
@@ -63,7 +63,7 @@ repos:
           - --multi-line=9
           - --project=generic_connection_pool
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.1.1
+    rev: v1.5.1
     hooks:
       - id: mypy
         stages:
