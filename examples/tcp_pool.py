@@ -31,7 +31,7 @@ def command(addr: IpAddress, port: int, cmd: str) -> None:
 
 
 try:
-    command(IPv4Address('127.0.0.1'), 6379, 'CLIENT ID')  # tcp connection is opened
-    command(IPv4Address('127.0.0.1'), 6379, 'INFO')  # tcp connection is reused
+    command(IPv4Address('127.0.0.1'), 6379, 'CLIENT ID')  # tcp connection opened
+    command(IPv4Address('127.0.0.1'), 6379, 'INFO')  # tcp connection reused
 finally:
     redis_pool.close()

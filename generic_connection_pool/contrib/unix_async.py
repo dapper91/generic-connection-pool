@@ -11,7 +11,7 @@ from generic_connection_pool.contrib.socket_async import BaseConnectionManager, 
 from generic_connection_pool.contrib.socket_async import StreamAlivenessCheckingMixin
 
 if sys.platform not in ('linux', 'darwin', 'freebsd'):
-    raise AssertionError('this module is supported only on unix platforms')
+    raise AssertionError('this module is only supported by unix platforms')
 
 
 UnixSocketEndpoint = pathlib.Path

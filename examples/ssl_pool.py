@@ -46,7 +46,7 @@ def fetch(url: str, timeout: float = 5.0) -> None:
 
 
 try:
-    fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection is opened
-    fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection is reused
+    fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection opened
+    fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection reused
 finally:
     http_pool.close()

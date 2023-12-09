@@ -27,19 +27,19 @@ pg_pool = ConnectionPool[Endpoint, Connection](
 )
 
 try:
-    # connection is opened
+    # connection opened
     with pg_pool.connection(endpoint='master') as conn:
         cur = conn.cursor()
         cur.execute("SELECT * FROM pg_stats;")
         print(cur.fetchone())
 
-    # connection is opened
+    # connection opened
     with pg_pool.connection(endpoint='replica-1') as conn:
         cur = conn.cursor()
         cur.execute("SELECT * FROM pg_stats;")
         print(cur.fetchone())
 
-    # connection is reused
+    # connection reused
     with pg_pool.connection(endpoint='master') as conn:
         cur = conn.cursor()
         cur.execute("SELECT * FROM pg_stats;")

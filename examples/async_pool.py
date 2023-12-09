@@ -56,8 +56,8 @@ async def main() -> None:
             print(b''.join(chunks))
 
     try:
-        await fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection is opened
-        await fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection is reused
+        await fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection opened
+        await fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection reused
     finally:
         await http_pool.close()
 
