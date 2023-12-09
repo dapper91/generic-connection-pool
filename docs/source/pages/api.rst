@@ -30,11 +30,14 @@ _______
 .. automodule:: generic_connection_pool.contrib.socket_async
     :members:
 
-.. automodule:: generic_connection_pool.contrib.psycopg2
-    :members:
-
 .. automodule:: generic_connection_pool.contrib.unix
     :members:
 
 .. automodule:: generic_connection_pool.contrib.unix_async
+    :members:
+
+.. automodule:: generic_connection_pool.contrib.psycopg2
+    :members:
+
+.. automodule:: generic_connection_pool.contrib.asyncpg
     :members:

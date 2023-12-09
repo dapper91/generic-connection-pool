@@ -24,6 +24,9 @@ async def main() -> None:
 
     async def fetch(url: str, timeout: float = 5.0) -> None:
         url = urllib.parse.urlsplit(url)
+        if url.hostname is None:
+            raise ValueError
+
         port = url.port or 443 if url.scheme == 'https' else 80
 
         async with http_pool.connection(endpoint=(url.hostname, port), timeout=timeout) as (reader, writer):
@@ -56,8 +59,8 @@ async def main() -> None:
             print(b''.join(chunks))
 
     try:
-        await fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection is opened
-        await fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection is reused
+        await fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection opened
+        await fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection reused
     finally:
         await http_pool.close()
 

@@ -25,6 +25,9 @@ http_pool = ConnectionPool[Endpoint, Connection](
 
 def fetch(url: str, timeout: float = 5.0) -> None:
     url = urllib.parse.urlsplit(url)
+    if url.hostname is None:
+        raise ValueError
+
     port = url.port or 443 if url.scheme == 'https' else 80
 
     with http_pool.connection(endpoint=(url.hostname, port), timeout=timeout) as sock:
@@ -46,7 +49,7 @@ def fetch(url: str, timeout: float = 5.0) -> None:
 
 
 try:
-    fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection is opened
-    fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection is reused
+    fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection opened
+    fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection reused
 finally:
     http_pool.close()

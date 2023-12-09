@@ -14,7 +14,7 @@ from generic_connection_pool.threading import EndpointT
 from .socket import socket_timeout
 
 if sys.platform not in ('linux', 'darwin', 'freebsd'):
-    raise AssertionError('this module is supported only on unix platforms')
+    raise AssertionError('this module is only supported by unix platforms')
 
 
 UnixSocketEndpoint = pathlib.Path

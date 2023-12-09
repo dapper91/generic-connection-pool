@@ -110,8 +110,8 @@ The following example illustrates how to create https pool:
 
 
     try:
-        fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection is opened
-        fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection is reused
+        fetch('https://en.wikipedia.org/wiki/HTTP')  # http connection opened
+        fetch('https://en.wikipedia.org/wiki/Python_(programming_language)')  # http connection reused
     finally:
         http_pool.close()
 
@@ -148,19 +148,19 @@ The following example illustrates how to create https pool:
     )
 
     try:
-        # connection is opened
+        # connection opened
         with pg_pool.connection(endpoint='master') as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM pg_stats;")
             print(cur.fetchone())
 
-        # connection is opened
+        # connection opened
         with pg_pool.connection(endpoint='replica-1') as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM pg_stats;")
             print(cur.fetchone())
 
-        # connection is reused
+        # connection reused
         with pg_pool.connection(endpoint='master') as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM pg_stats;")
