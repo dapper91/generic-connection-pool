@@ -71,5 +71,6 @@ repos:
         name: mypy
         pass_filenames: false
         additional_dependencies:
-          - types-psycopg2
+          - types-psycopg2>=2.9.5
+          - asyncpg-stubs>=0.29.0
         args: ["--package", "generic_connection_pool"]
