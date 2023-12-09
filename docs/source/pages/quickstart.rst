@@ -73,7 +73,7 @@ ____________________
 
 After the pool is instantiated a connection can be acquired using :py:meth:`~generic_connection_pool.threading.ConnectionPool.acquire`
 and released using :py:meth:`~generic_connection_pool.threading.ConnectionPool.release`.
-To get rid of boilerplate code the connection manager supports automated acquiring using
+To get rid of boilerplate code the connection pool supports automated connection acquiring using
 :py:meth:`~generic_connection_pool.threading.ConnectionPool.connection` returning a context manager:
 
 
@@ -87,7 +87,7 @@ To get rid of boilerplate code the connection manager supports automated acquiri
 Connection aliveness checks
 ___________________________
 
-Connection manager provides an api for connection aliveness checks.
+Connection manager provides the api for connection aliveness checks.
 To implement that override method :py:meth:`~generic_connection_pool.threading.BaseConnectionManager.check_aliveness`.
 The method must return ``True`` if connection is alive and ``False`` otherwise:
 
