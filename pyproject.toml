@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "generic-connection-pool"
-version = "0.6.1"
+version = "0.7.0"
 description = "generic connection pool"
 authors = ["Dmitry Pershin <dapper1291@gmail.com>"]
 license = "Unlicense"
