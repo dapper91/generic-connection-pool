@@ -30,19 +30,19 @@ try:
     # connection opened
     with pg_pool.connection(endpoint='master') as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM pg_stats;")
+        cur.execute("SELECT inet_server_addr()")
         print(cur.fetchone())
 
     # connection opened
     with pg_pool.connection(endpoint='replica-1') as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM pg_stats;")
+        cur.execute("SELECT inet_server_addr()")
         print(cur.fetchone())
 
     # connection reused
     with pg_pool.connection(endpoint='master') as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM pg_stats;")
+        cur.execute("SELECT inet_server_addr()")
         print(cur.fetchone())
 
 finally:
