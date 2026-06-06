@@ -1,3 +1,10 @@
+# [0.8.0](https://github.com/dapper91/generic-connection-pool/compare/v0.7.0...v0.8.0) (2026-06-06)
+
+
+### Features
+
+* python3.9 support dropped, python3.14 support added. ([8d625f5](https://github.com/dapper91/generic-connection-pool/commit/8d625f5cc02f373686e99c53146ba891e33d4abc))
+
 # 0.7.0 (2023-12-09)
 
 
