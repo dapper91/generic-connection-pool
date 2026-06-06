@@ -1,0 +1,22 @@
+name: publish
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Install poetry
+        run: pip install poetry
+      - name: Build and publish
+        run: |
+          poetry build
+          poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}
