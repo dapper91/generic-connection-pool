@@ -16,17 +16,18 @@ ROOT_PATH = THIS_PATH.parent.parent
 sys.path.insert(0, str(ROOT_PATH))
 
 PYPROJECT = toml.load(ROOT_PATH / 'pyproject.toml')
-PROJECT_INFO = PYPROJECT['tool']['poetry']
+PROJECT_INFO = PYPROJECT['project']
 
 project = PROJECT_INFO['name']
 copyright = f"2023, {PROJECT_INFO['name']}"
-author = PROJECT_INFO['authors'][0]
+author = PROJECT_INFO['authors'][0]['name']
 release = PROJECT_INFO['version']
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'myst_parser',
     'sphinx.ext.autodoc',
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',

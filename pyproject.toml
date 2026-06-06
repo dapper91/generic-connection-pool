@@ -1,8 +1,10 @@
-[tool.poetry]
+[project]
 name = "generic-connection-pool"
 version = "0.7.0"
 description = "generic connection pool"
-authors = ["Dmitry Pershin <dapper1291@gmail.com>"]
+authors = [
+    {name = "Dmitry Pershin",email = "dapper1291@gmail.com"}
+]
 license = "Unlicense"
 readme = "README.rst"
 homepage = "https://github.com/dapper91/generic-connection-pool"
@@ -24,49 +26,43 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
+requires-python = ">=3.10"
 
-[tool.poetry.dependencies]
-python = ">=3.9"
-psycopg2 = {version = ">=2.9.5", optional = true}
-asyncpg = {version = "^0.29.0", optional = true}
+dependencies = [
+]
 
-furo = {version = "^2023.7.26", optional = true}
-Sphinx = {version = "^6.2.1", optional = true}
-sphinx_design = {version = "^0.5.0", optional = true}
-toml = {version = "^0.10.2", optional = true}
-sphinx-copybutton = {version = "^0.5.2", optional = true}
 
-[tool.poetry.extras]
-psycopg2 = ["psycopg2"]
-asyncpg = ["asyncpg"]
-docs = ['Sphinx', 'sphinx_design', 'sphinx-copybutton', 'furo', 'toml']
-
-[tool.poetry.dev-dependencies]
-pre-commit = "^3.3.3"
-mypy = "^1.4.1"
-pytest = "^7.4.0"
-pytest-asyncio = "^0.21.1"
-pytest-mock = "^3.11.1"
-pytest-cov = "^4.1.0"
-types-psycopg2 = "^2.9.21"
-pytest-timeout = "^2.1.0"
-asyncpg-stubs = {version = "^0.29.0", python = ">=3.9,<4.0"}
-
+[project.optional-dependencies]
+psycopg2 = ["psycopg2 (>=2.9.5)"]
+asyncpg = ["asyncpg (>=0.29.0)"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-
-[tool.mypy]
-allow_redefinition = true
-disallow_incomplete_defs = true
-disallow_any_generics = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-show_error_codes = true
-strict_equality = true
-warn_unused_ignores = true
+[dependency-groups]
+dev = [
+    "mypy (>=2.1.0,<3.0.0)",
+    "pytest (>=9.0.3,<10.0.0)",
+    "pytest-asyncio (>=1.4.0,<2.0.0)",
+    "pytest-mock (>=3.15.1,<4.0.0)",
+    "pytest-cov (>=7.1.0,<8.0.0)",
+    "pytest-timeout (>=2.4.0,<3.0.0)",
+    "types-psycopg2 (>=2.9.21,<3.0.0)",
+    "asyncpg-stubs (>=0.31.2,<0.32.0) ; python_version >= \"3.9\" and python_version < \"4.0\""
+]
+docs = [
+    "toml (>=0.10.2,<0.11.0)",
+    "sphinx-design (>=0.6.0,<0.7.0)",
+    "myst-parser (>=4.0.0,<5.0.0)",
+    "sphinx (>=8.0.0,<9.0.0)",
+    "sphinx-copybutton (>=0.5.2,<0.6.0)",
+    "furo (>=2025.12.19,<2026.0.0)",
+]
+pre-commit = [
+    "pre-commit (>=4.6.0,<5.0.0)"
+]

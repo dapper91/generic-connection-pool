@@ -1,24 +1,32 @@
 name: release
 
 on:
-  release:
+  workflow_run:
+    workflows:
+      - test
+    branches:
+      - master
     types:
-      - released
+      - completed
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip poetry
-        poetry install
-    - name: Build and publish
-      run: |
-        poetry build
-        poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+      - uses: actions/checkout@v6
+      - uses: codfish/semantic-release-action@v4
+        with:
+          additional-packages: |
+            [
+              '@covage/semantic-release-pyproject-plugin',
+              '@semantic-release/changelog',
+              '@semantic-release/git',
+              '@semantic-release/github'
+            ]
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
