@@ -1,54 +1,65 @@
 default_stages:
- - commit
- - merge-commit
+  - pre-commit
+  - pre-merge-commit
 
 repos:
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.16.3
+    hooks:
+      - id: commitizen
+        stages:
+          - commit-msg
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
       - id: check-toml
       - id: trailing-whitespace
       - id: end-of-file-fixer
         stages:
-          - commit
+          - pre-commit
       - id: mixed-line-ending
         name: fix line ending
         stages:
-          - commit
+          - pre-commit
         args:
           - --fix=lf
       - id: mixed-line-ending
         name: check line ending
         stages:
-          - merge-commit
+          - pre-merge-commit
         args:
           - --fix=no
+      - id: no-commit-to-branch
+        stages:
+          - pre-commit
+        args:
+          - --branch=master
   - repo: https://github.com/asottile/add-trailing-comma
-    rev: v3.1.0
+    rev: v4.0.0
     hooks:
       - id: add-trailing-comma
         stages:
-          - commit
-  - repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v2.0.4
+          - pre-commit
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.3.2
     hooks:
       - id: autopep8
         stages:
-          - commit
+          - pre-commit
         args:
           - --diff
   - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
+    rev: 7.3.0
     hooks:
       - id: flake8
   - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+    rev: 9.0.0a3
     hooks:
       - id: isort
         name: fix import order
         stages:
-          - commit
+          - pre-commit
         args:
           - --line-length=120
           - --multi-line=9
@@ -56,18 +67,18 @@ repos:
       - id: isort
         name: check import order
         stages:
-          - merge-commit
+          - pre-merge-commit
         args:
           - --check-only
           - --line-length=120
           - --multi-line=9
           - --project=generic_connection_pool
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.1
+    rev: v2.1.0
     hooks:
       - id: mypy
         stages:
-          - commit
+          - pre-commit
         name: mypy
         pass_filenames: false
         additional_dependencies:
