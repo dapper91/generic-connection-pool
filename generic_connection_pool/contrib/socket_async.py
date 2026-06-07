@@ -54,9 +54,12 @@ class TcpSocketConnectionManager(
             raise RuntimeError("unsupported address version type: %s", addr.version)
 
         sock = socket.socket(family=family, type=socket.SOCK_STREAM)
-        sock.setblocking(False)
-
-        await loop.sock_connect(sock, address=(str(addr), port))
+        try:
+            sock.setblocking(False)
+            await loop.sock_connect(sock, address=(str(addr), port))
+        except BaseException:
+            sock.close()
+            raise
 
         return sock
 
