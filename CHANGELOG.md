@@ -1,3 +1,11 @@
+## [0.8.1](https://github.com/dapper91/generic-connection-pool/compare/v0.8.0...v0.8.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* documentation build fixed. ([b2e3aea](https://github.com/dapper91/generic-connection-pool/commit/b2e3aea46aaa13c2d273b43ddce76fdcb7cbcf24))
+* socket leak fixed. ([088a31f](https://github.com/dapper91/generic-connection-pool/commit/088a31fb9f445521364c4a780d78b33844368096))
+
 # [0.8.0](https://github.com/dapper91/generic-connection-pool/compare/v0.7.0...v0.8.0) (2026-06-06)
 
 

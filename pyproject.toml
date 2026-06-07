@@ -1,6 +1,6 @@
 [project]
 name = "generic-connection-pool"
-version = "0.8.0"
+version = "0.8.1"
 description = "generic connection pool"
 authors = [
     {name = "Dmitry Pershin",email = "dapper1291@gmail.com"}
