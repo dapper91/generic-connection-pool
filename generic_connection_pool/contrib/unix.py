@@ -49,8 +49,12 @@ class UnixSocketConnectionManager(
     def create(self, endpoint: UnixSocketEndpoint, timeout: Optional[float] = None) -> socket.socket:
         sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
 
-        with socket_timeout(sock, timeout):
-            sock.connect(str(endpoint))
+        try:
+            with socket_timeout(sock, timeout):
+                sock.connect(str(endpoint))
+        except BaseException:
+            sock.close()
+            raise
 
         return sock
 

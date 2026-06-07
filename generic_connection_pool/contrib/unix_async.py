@@ -29,9 +29,12 @@ class UnixSocketConnectionManager(
         loop = asyncio.get_running_loop()
 
         sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
-        sock.setblocking(False)
-
-        await loop.sock_connect(sock, address=(str(endpoint)))
+        try:
+            sock.setblocking(False)
+            await loop.sock_connect(sock, address=(str(endpoint)))
+        except BaseException:
+            sock.close()
+            raise
 
         return sock
 

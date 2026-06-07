@@ -18,10 +18,14 @@ class RedisConnectionManager(BaseConnectionManager[Endpoint, socket.socket]):
         addr, port = endpoint
 
         sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
-        sock.connect((str(addr), port))
+        try:
+            sock.connect((str(addr), port))
 
-        if (resp := self.cmd(sock, f'AUTH {self._username} {self._password}')) != '+OK':
-            raise RuntimeError(f"authentication failed: {resp}")
+            if (resp := self.cmd(sock, f'AUTH {self._username} {self._password}')) != '+OK':
+                raise RuntimeError(f"authentication failed: {resp}")
+        except BaseException:
+            sock.close()
+            raise
 
         return sock
 
